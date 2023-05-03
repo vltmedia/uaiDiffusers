@@ -231,16 +231,17 @@ def RunSDLora(sdRepo = "wavymulder/portraitplus", loraPath = "justinjaro_lora/py
     images = pipe(prompt=prompt,negative_prompt=negative_prompt, num_inference_steps=55, guidance_scale=7, num_images_per_prompt=imagesToGenerate).images
     return images
 
-def imageGrid(imgs, rows, cols):
+def imageGrid(imgs, rows, maxWidth = 1080):
     from  PIL import Image
-    assert len(imgs) == rows*cols
-
+    cols =  int(len(imgs)/rows)
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols*w, rows*h))
     grid_w, grid_h = grid.size
-    
+
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i%cols*w, i//cols*h))
+    
+    grid = grid.resize((maxWidth, int(grid_h/grid_w*maxWidth)))
     return grid
 
 def AugmentFaceSDControlnetLoraFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", loraPath="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42):
@@ -252,3 +253,54 @@ def AugmentFaceSDControlnetLoraFace(pilImg, sdRepo="wavymulder/portraitplus",can
     mask_blur = faceMasked.filter(ImageFilter.GaussianBlur(maskFeather))
     appliedFace = Image.composite(faceImages[0], pilImg, mask_blur)
     return appliedFace, selfieMask,  facemask
+
+def CropFace(cv2image, padding = 200, size = (256, 256)):
+    # convert to RGB
+    (height, width) = cv2image.shape[:2]
+    newImage = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
+    newImage = cv2.resize(newImage, (height + padding, width + padding))
+    cv2image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
+    # initialize the face detection model
+    faceDetection = mp.solutions.face_detection.FaceDetection()
+    # detect the face
+    results = faceDetection.process(cv2image)
+    try:
+        # get the bounding box of the face
+        boundingBox = results.detections[0].location_data.relative_bounding_box
+        # get the width and height of the image
+        # get the coordinates of the bounding box
+        dimensionPad = int(padding / 2)
+        (startX, startY, endX, endY) = (boundingBox.xmin, boundingBox.ymin, boundingBox.xmin + boundingBox.width, boundingBox.ymin + boundingBox.height)
+        # convert the coordinates to pixels
+        (startX, startY, endX, endY) = (int(startX * width), int(startY * height), int(endX * width), int(endY * height))
+        (startX, startY, endX, endY) = (startX - dimensionPad, startY - dimensionPad, endX + dimensionPad, endY + dimensionPad)
+        if startX < 0:
+            startX = 0
+        if startY < 0:
+            startY = 0
+        if endX > width:
+            endX = width
+        if endY > height:
+            endY = height
+        faceROI = cv2image[startY:endY, startX:endX]
+        faceROI = cv2.resize(faceROI, size)
+        # convert the face ROI to RGB
+        faceROI = cv2.cvtColor(faceROI, cv2.COLOR_BGR2RGB)
+        # return the face ROI
+        return faceROI
+    except:
+        return None
+    
+def CreateFaceDataset(inputSearchPattern = "johnSmith\johnSmith*.jpg", outputImageDir = "johnSmith\output", prefix = "johnSmith", padding = 200, size = (512, 512)):
+    import glob
+    import os
+    inputImageDir = glob.glob(inputSearchPattern)
+    if not os.path.exists(outputImageDir):
+        os.makedirs(outputImageDir)
+    for indx, img in enumerate(inputImageDir):
+        print(f"Processing image {indx+1} / {len(inputImageDir)}")
+        n= cv2.imread(img)
+        faceROI = CropFace(n, padding, size)
+        if isinstance( faceROI, np.ndarray):
+            newimage = CV2ToPIL(faceROI)
+            newimage.save(f"{outputImageDir}\{prefix}_{str(indx).zfill(4)}.png")
