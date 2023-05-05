@@ -11,7 +11,7 @@ from diffusers import StableDiffusionControlNetPipeline, StableDiffusionPipeline
 import cv2
 import uaiDiffusers.hair as hair
 
-def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "justinjaro_lora/pytorch_lora_weights.bin", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42):
+def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42):
     if isinstance(inputFaceImage, str):
         inputFaceImage = load_image(inputFaceImage)
     if isinstance(inputFaceMask, str):
@@ -36,7 +36,17 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
     )
     
     pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
-    pipe.load_attn_procs(loraPath)
+    if loraPath != "":
+        pipe.load_attn_procs(loraPath)
+    import os
+    
+    if customSDBin != "":   
+        pipe.unet.load_attn_procs(customSDBin)
+    if textualInversion != "":
+        pipe.load_textual_inversion(textualInversion)
+        # pipe.load_textual_inversion(os.path.dirname(textualInversion), weight_name=os.path.basename(textualInversion))
+        # pipe.unet.load_attn_procs(os.path.dirname(customSDBin), weight_name=os.path.basename(customSDBin))
+
     
     pipe = StableDiffusionControlNetPipeline(**pipe.components, controlnet=controlnet
     )
@@ -244,15 +254,37 @@ def imageGrid(imgs, rows, maxWidth = 1080):
     grid = grid.resize((maxWidth, int(grid_h/grid_w*maxWidth)))
     return grid
 
-def AugmentFaceSDControlnetLoraFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", loraPath="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42):
+def AugmentFaceCustomSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", textualInversion="justinjaro_lora\johnsmith.bin", customSDBin="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42, steps=25):
+    baseFaceImage = np.array(pilImg)
+    selfieMask, person = GetSelfieBodyMask(baseFaceImage)
+    facemask, faceMasked = ExtractFace(baseFaceImage)
+    faceImages = GenerateFace(inputFaceImage=baseFaceImage, inputFaceMask=selfieMask, sdRepo=sdRepo,cannyRepo=cannyRepo, customSDBin=customSDBin,textualInversion=textualInversion, prompt_=prompt_, negPrompt_=negPrompt_, imagesToGenerate=imagesToGenerate, seed=seed, steps=steps)
+    outimages =  []
+    for img in faceImages:
+        mask_blur = faceMasked.filter(ImageFilter.GaussianBlur(maskFeather))
+        # make sure PilImage is in RGBA mode
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+        if pilImg.mode != "RGBA":
+            pilImg = img.convert("RGBA")
+        if mask_blur.mode != "RGBA":
+            mask_blur = img.convert("RGBA")
+        appliedFace = Image.composite(img, pilImg, mask_blur)
+        outimages.append(appliedFace)
+    return outimages, selfieMask,  facemask
+
+def AugmentFaceSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", loraPath="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42):
     baseFaceImage = np.array(pilImg)
     selfieMask, person = GetSelfieBodyMask(baseFaceImage)
     facemask, faceMasked = ExtractFace(baseFaceImage)
     faceImages = GenerateFace(inputFaceImage=baseFaceImage, inputFaceMask=selfieMask, sdRepo=sdRepo,cannyRepo=cannyRepo, loraPath=loraPath, prompt_=prompt_, negPrompt_=negPrompt_, imagesToGenerate=imagesToGenerate, seed=seed)
-
-    mask_blur = faceMasked.filter(ImageFilter.GaussianBlur(maskFeather))
-    appliedFace = Image.composite(faceImages[0], pilImg, mask_blur)
-    return appliedFace, selfieMask,  facemask
+    
+    outimages =  []
+    for img in faceImages:
+        mask_blur = faceMasked.filter(ImageFilter.GaussianBlur(maskFeather))
+        appliedFace = Image.composite(img, pilImg, mask_blur)
+        outimages.append(appliedFace)
+    return outimages, selfieMask,  facemask
 
 def CropFace(cv2image, padding = 200, size = (256, 256)):
     # convert to RGB
