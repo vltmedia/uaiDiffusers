@@ -9,9 +9,15 @@ from diffusers import ControlNetModel, UniPCMultistepScheduler, DPMSolverMultist
 from diffusers.utils import load_image
 from diffusers import StableDiffusionControlNetPipeline, StableDiffusionPipeline
 import cv2
+import zipfile
+import io
+import flask
+import base64
+from flask import jsonify
+
 import uaiDiffusers.hair as hair
 
-def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42):
+def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
     if isinstance(inputFaceImage, str):
         inputFaceImage = load_image(inputFaceImage)
     if isinstance(inputFaceMask, str):
@@ -34,8 +40,10 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
     controlnet = ControlNetModel.from_pretrained(
         cannyRepo, torch_dtype=torch.float16
     )
-    
-    pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
+    if pipe_ is None:
+        pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
+    else:
+        pass
     if loraPath != "":
         pipe.load_attn_procs(loraPath)
     import os
@@ -59,6 +67,36 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
     pipe.enable_model_cpu_offload()
 
     images = pipe(prompt=prompt_, negative_prompt=negPrompt_, image=image, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, generator = generator).images
+    return images
+
+def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, pipe_ = None):
+    # image = Image.fromarray(image)
+  
+    if pipe_ is None:
+        pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
+    else:
+        pipe = pipe_
+    if loraPath != "":
+        pipe.load_attn_procs(loraPath)
+    import os
+    
+    if customSDBin != "":   
+        pipe.unet.load_attn_procs(customSDBin)
+    if textualInversion != "":
+        pipe.load_textual_inversion(textualInversion)
+        # pipe.load_textual_inversion(os.path.dirname(textualInversion), weight_name=os.path.basename(textualInversion))
+        # pipe.unet.load_attn_procs(os.path.dirname(customSDBin), weight_name=os.path.basename(customSDBin))
+
+    generator = torch.Generator(device=device).manual_seed(seed)
+
+    # Remove if you do not have xformers installed
+    # see https://huggingface.co/docs/diffusers/v0.13.0/en/optimization/xformers#installing-xformers
+    # for installation instructions
+    #pipe.enable_xformers_memory_efficient_attention()
+
+    pipe.enable_model_cpu_offload()
+
+    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, generator = generator, width = width, height= height).images
     return images
 
 def MaskOutGeneratedFace (generatedImage, mask_image):
@@ -336,3 +374,119 @@ def CreateFaceDataset(inputSearchPattern = "johnSmith\johnSmith*.jpg", outputIma
         if isinstance( faceROI, np.ndarray):
             newimage = CV2ToPIL(faceROI)
             newimage.save(f"{outputImageDir}\{prefix}_{str(indx).zfill(4)}.png")
+
+
+    
+def GetFace(filePath = "johnSmith\johnSmith*.jpg", padding = 200, size = (512, 512)):
+    n= cv2.imread(filePath)
+    faceROI = CropFace(n, padding, size)
+    if isinstance( faceROI, np.ndarray):
+        newimage = CV2ToPIL(faceROI)
+        return newimage
+    else:
+        return None
+
+
+
+def ImagesToZip(pilImages):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    imgs = []
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', compression=zipfile.ZIP_DEFLATED) as zipObject:
+        for indx, img in enumerate(pilImages):
+            img_io = io.BytesIO()
+            img.save(img_io, 'PNG', quality=100)
+            img_io.seek(0)
+            imgs.append(img_io)
+            zipObject.writestr("image_"+ str(indx).zfill(4) + ".png" , img_io.read())
+    memory_file.seek(0)
+    return memory_file
+
+def ImagesToZipFlaskResponse(pilImages):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    return  flask.send_file(ImagesToZip(pilImages), mimetype='application/zip')
+
+def ImagesToBytes(pilImage):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    img_io = io.BytesIO()
+    pilImage.save(img_io, 'PNG', quality=100)
+    img_io.seek(0)
+    # return the pilImage as an image
+    return img_io
+def ImagesToBase64(pilImage):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    # return the pilImage as an image
+    return  base64.b64encode(ImagesToBytes(pilImage).getvalue()).decode()
+
+def ImagesToFlaskResponse(pilImage):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    # return the pilImage as an image
+    return ImagesToBytes(pilImage)
+
+
+def MultiImagesToFlaskResponse(pilImages, prompts):
+    '''
+    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    '''
+    # return the pilImage as an image
+    outJS = {"media":[]}
+    for indx, img in enumerate(pilImages):
+        prompt = ""
+        try:
+            prompt = prompts[indx]
+        except:
+            prompt = ""
+        outJS["media"].append({"media":ImagesToBase64(img), "prompt":prompt})
+        
+    return jsonify(outJS)
+
+def Base64StringToPILImage(base64String):
+    '''
+    Takes a base64 string and returns a PIL image
+    '''
+    return PIL.Image.open(io.BytesIO(base64.b64decode(base64String)))
+
+def uaiPromptImageJSONObjectToPILImage(promptImage):
+    '''
+    Takes a prompt image from the UAI API and returns a PIL image
+    '''
+    return Base64StringToPILImage(promptImage["media"])
+
+
+def uaiPromptMultiImageJSONObjectToPILImage(promptImages):
+    '''
+    Takes a prompt image from the UAI API and returns a PIL image
+    '''
+    imgs = []
+    for indx, img in enumerate(promptImages['media']):
+        imgs.append(Base64StringToPILImage(img["media"]))
+    return imgs
+
+def saveUAIPromptMultiPILImageObjectToFiles(promptImages, filepath):
+    for indx , img in enumerate(promptImages):
+        img.save(filepath + str(indx).zfill(4) + ".png")
+
+def saveUAIPromptMultiImageJSONObjectToFiles(promptImages, filepath):
+    for indx , img in enumerate(promptImages['media']):
+        saveUAIPromptImageJSONObjectToFiles(img, filepath  + str(indx).zfill(4) + ".png")
+
+def saveUAIPromptImageJSONObjectToFiles(promptImage, filepath):
+    '''
+    Takes a prompt image from the UAI API and returns a PIL image
+    '''
+    piImage = Base64StringToPILImage(promptImage["media"])
+    piImage.save(filepath)
+    return piImage
+
+
+
