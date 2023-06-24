@@ -18,6 +18,7 @@ from transformers import pipeline, DPTImageProcessor, DPTForDepthEstimation
 import glob
 import os
 import uaiDiffusers.hair as hair
+from uaiDiffusers.classes.mediaRequestBase64 import MediaRequestBase64, MultipleMediaRequest
 
 def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
     """
@@ -565,7 +566,13 @@ def GetFace(filePath = "johnSmith/johnSmith*.jpg", padding = 200, size = (512, 5
 
 def ImagesToZip(pilImages):
     '''
-    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    Takes a list of PIL images and returns a zip binary in memory ready to be saved out or sent
+    
+    Args:
+        pilImages (list): list of PIL images
+    
+    Returns:
+        memory_file (BytesIO): zip binary in memory
     '''
     imgs = []
     memory_file = io.BytesIO()
@@ -581,13 +588,25 @@ def ImagesToZip(pilImages):
 
 def ImagesToZipFlaskResponse(pilImages):
     '''
-    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    Takes a list of PIL images and creates a flask response with a zip binary in memory ready to be saved out or sent
+    Args:
+        pilImages (list): list of PIL images
+    
+    Returns:
+        flask.Response: flask response with a zip binary in memory
+    
     '''
     return  flask.send_file(ImagesToZip(pilImages), mimetype='application/zip')
 
-def ImagesToBytes(pilImage):
+def ImageToBytes(pilImage):
     '''
-    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    Takes a PIL image and convert it to a BytesIO object
+    
+    Args:
+        pilImage (PIL.Image): PIL image
+    
+    Returns:
+        img_io (BytesIO): BytesIO object
     '''
     img_io = io.BytesIO()
     pilImage.save(img_io, 'PNG', quality=100)
@@ -596,34 +615,49 @@ def ImagesToBytes(pilImage):
     return img_io
 def ImagesToBase64(pilImage):
     '''
-    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    
+    Takes a PIL image and convert it to a Base64 string
+    
+    Args:
+        pilImage (PIL.Image): PIL image
+    
+    Returns:
+        base64String (str): Base64 string
     '''
     # return the pilImage as an image
-    return  base64.b64encode(ImagesToBytes(pilImage).getvalue()).decode()
+    return  base64.b64encode(ImageToBytes(pilImage).getvalue()).decode()
 
 def ImagesToFlaskResponse(pilImage):
     '''
     Takes a list of PIL images and returns a zip binary ready to be saved out or sent
     '''
     # return the pilImage as an image
-    return ImagesToBytes(pilImage)
+    return ImageToBytes(pilImage)
 
 
 def MultiImagesToFlaskResponse(pilImages, prompts):
     '''
-    Takes a list of PIL images and returns a zip binary ready to be saved out or sent
+    Takes a list of PIL images and prompts of the same count and returns a MultipleMediaRequest JSON object containing the images and prompts as MediaRequestBase64 objects
+    
+    Args:
+        pilImages (list): A list of PIL images
+        prompts (list): A list of prompts
+        
+    Returns:
+        JSONString (str): A MultipleMediaRequest JSON string
     '''
     # return the pilImage as an image
-    outJS = {"media":[]}
+    
+    MultipleMediaRequest_ = MultipleMediaRequest()
     for indx, img in enumerate(pilImages):
         prompt = ""
         try:
             prompt = prompts[indx]
         except:
             prompt = ""
-        outJS["media"].append({"media":ImagesToBase64(img), "prompt":prompt})
+        MultipleMediaRequest_.addMedia(MediaRequestBase64(ImagesToBase64(img), prompt))
         
-    return jsonify(outJS)
+    return jsonify(MultipleMediaRequest_.toJSON())
 
 def Base64StringToPILImage(base64String):
     '''
