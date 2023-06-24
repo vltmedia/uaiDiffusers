@@ -8,6 +8,15 @@ from diffusers.pipeline_utils import WEIGHTS_NAME, ONNX_WEIGHTS_NAME, SCHEDULER_
 from transformers import AutoConfig
 
 def MergePytorchBins(model1_path, model2_path, outputPath):
+    """
+    Merge multiple pytorch model .bin files into a single model .bin file.
+    Used mainly to merge Stable Diffusion models.
+    
+    Args:
+        model1_path (str): Path to the first model .bin file
+        model2_path (str): Path to the second model .bin file
+        outputPath (str): Path to save the merged model .bin file
+    """
     # Prompt user for input paths
     config_path = input("Enter the path to the config.json file: ")
 
@@ -32,11 +41,24 @@ def MergePytorchBins(model1_path, model2_path, outputPath):
     print("Merged model saved as " + outputPath)
 
 class CheckpointMergerPipeline(DiffusionPipeline):
-
+    """
+    Merge Multiple checkpoints of the same model into a single checkpoint.
+    
+    """
     def __init__(self):
         super().__init__()
 
     def _compare_model_configs(self, dict0, dict1):
+        """
+        Compare two model configs and return True if they are the same.
+
+        Args:
+            dict0 (Dict): First model config
+            dict1 (Dict): Second model config
+        
+        Returns:
+            bool: True if the two configs are the same, False otherwise.
+        """
         if dict0 == dict1:
             return True
         else:

@@ -43,6 +43,16 @@ class HairSegmentation():
         self.getModel_output_details()
 
     def segment_hair(self, image):
+        """
+        Segments hair from the input image
+        
+        Args:
+            image (np.array): Input image
+            
+        Returns:
+            np.array: Hair mask
+        
+        """
 
         input_tensor = self.prepare_input(image)
 
@@ -158,7 +168,15 @@ def download_gdrive_model(gdrive_id, model_path):
         shutil.rmtree("tmp/")
 
 def download_github_model(model_url, model_path):
-
+    """
+    Download model from github to a local path
+    
+    Args:
+        model_url: url of the model
+        model_path: local path to save the model
+    Returns:
+        None
+    """
     if not os.path.exists(model_path):
         model_data = urllib.request.urlopen(model_url).read()
         model_bytes = bytearray(model_data)

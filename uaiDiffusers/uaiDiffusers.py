@@ -14,10 +14,36 @@ import io
 import flask
 import base64
 from flask import jsonify
-
+from transformers import pipeline, DPTImageProcessor, DPTForDepthEstimation
+import glob
+import os
 import uaiDiffusers.hair as hair
 
 def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
+    """
+    Generates a face from a face image and a face mask using Stable Diffusion.
+    
+    Args:
+        inputFaceImage (str): Path to the face image.
+        inputFaceMask (str): Path to the face mask.
+        sdRepo (str): Path to the Stable Diffusion model.
+        cannyRepo (str): Path to the Canny model.
+        loraPath (str): Path to the LoRA model.
+        textualInversion (str): Path to the textual inversion model.
+        customSDBin (str): Path to the custom Stable Diffusion model.
+        imagesToGenerate (int): Number of images to generate.
+        steps (int): Number of steps.
+        device (str): Device to use.
+        prompt_ (str): Text Prompt to use.
+        negPrompt_ (str): Text Negative prompt to remove certain things from an image.
+        low_threshold (int): Low threshold for Canny.
+        high_threshold (int): High threshold for Canny.
+        seed (int): Seed to use.
+        pipe_ (StableDiffusionPipeline): Stable Diffusion pipeline to use.
+        
+    
+    """
+    
     if isinstance(inputFaceImage, str):
         inputFaceImage = load_image(inputFaceImage)
     if isinstance(inputFaceMask, str):
@@ -70,6 +96,29 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
     return images
 
 def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, pipe_ = None):
+    """
+    Generate an image from a text prompt using Stable Diffusion.
+    
+    Args:
+        sdRepo (str): The Stable Diffusion model to use.
+        loraPath (str): The path to the LoRA model to use.
+        textualInversion (str): The path to the textual inversion model to use. 
+        customSDBin (str): The path to the custom Stable Diffusion model to use.
+        imagesToGenerate (int): The number of images to generate.
+        steps (int): The number of steps to use.
+        device (str): The device to use.
+        prompt_ (str): The prompt to use.
+        negPrompt_ (str): The negative prompt to use.
+        seed (int): The seed to use.
+        width (int): The width of the image to generate.
+        height (int): The height of the image to generate.
+        pipe_ (StableDiffusionPipeline): The Stable Diffusion pipeline to use. Set this to keep from reinitializing models.
+        
+    Returns:
+        images (list): A list of images generated.
+        
+    """
+    
     # image = Image.fromarray(image)
   
     if pipe_ is None:
@@ -100,6 +149,15 @@ def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", tex
     return images
 
 def MaskOutGeneratedFace (generatedImage, mask_image):
+    """
+    Mask out a generated face using a 0 - 1 mask
+    
+    Args:
+        generatedImage (PIL.Image): The generated image to mask.
+        mask_image (PIL.Image): The mask to use.
+    Returns:
+        result (PIL.Image): The masked image.
+    """
     import numpy
     I = numpy.asarray(generatedImage)
     mask_I = numpy.asarray(mask_image)
@@ -112,6 +170,14 @@ def MaskOutGeneratedFace (generatedImage, mask_image):
     return result
 
 def InvertMask(mask_):
+    """
+    Invert a mask from 0 - 1 to 1 - 0
+    
+    Args:
+        mask_ (PIL.Image): The mask to invert.
+    Returns:
+        newmask_ (PIL.Image): The inverted mask.
+    """
     matrix = 255 - np.asarray(mask_)
     newmask_ = Image.fromarray(matrix)
     return newmask_
@@ -120,6 +186,24 @@ def RunInpainting(templateImage, mask_):
     print("do painting")
 
 def GenerateBackground(foregroundImage, mask_, sdRepo = "stabilityai/stable-diffusion-2-inpainting", prompt_ = "A park",negPrompt_="Missing body", imagesToGenerate = 1, seed = 42, device="cuda"):
+    """
+    Generate a background for an image using Stable Diffusion.
+    
+    Args:
+        foregroundImage (PIL.Image): The foreground image to use.
+        mask_ (PIL.Image): The mask to use.
+        sdRepo (str): The Stable Diffusion model to use.
+        prompt_ (str): The prompt to use.
+        negPrompt_ (str): The negative prompt to use.
+        imagesToGenerate (int): The number of images to generate.
+        seed (int): The seed to use.
+        device (str): The device to use.
+        
+    Returns:
+        image (PIL.Image): The generated image.
+        
+    """
+    
     from diffusers import StableDiffusionInpaintPipeline
     pipe = StableDiffusionInpaintPipeline.from_pretrained(
         sdRepo,
@@ -135,6 +219,16 @@ def GenerateBackground(foregroundImage, mask_, sdRepo = "stabilityai/stable-diff
 
 
 def ExtractFace(pilImage):
+    """
+    Extract a face from an image
+    
+    Args:
+        pilImage (PIL.Image): The image to extract a face from.
+        
+    Returns:
+        face (PIL.Image): The extracted face.
+        
+    """
     import numpy as np
     mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True)
@@ -190,21 +284,56 @@ def ExtractFace(pilImage):
     return PIL.Image.fromarray(mask) , out
 
 def PILToCV2(pilImage, colorSpace = cv2.COLOR_RGB2BGR):
+    """
+    Convert a PIL image to a CV2 image.
+    
+    Args:
+        pilImage (PIL.Image): The PIL image to convert.
+        colorSpace (int): The  cv2 color space to use.
+    
+    Returns:
+        cv2Image (cv2.Image): The converted image.
+    """
     import numpy as np
     return cv2.cvtColor(np.array(pilImage), colorSpace)
 
 def CV2ToPIL(cv2Image, colorSpace = cv2.COLOR_BGR2RGB):
+    """
+    Convert a CV2 image to a PIL image.
+    
+    Args:
+        cv2Image (cv2.Image): The cv2 image to convert.
+        colorSpace (int): The  cv2 color space to use.
+    
+    Returns:
+        image (PIL.Image): The converted PIL image.
+    """
     return PIL.Image.fromarray(cv2.cvtColor(cv2Image, colorSpace))
 
 def GetSelfieBodyMask(img, threshold = 0.5 , model_selection = 0):
+    """
+    Get a mask of a person in a selfie.
+    
+    Args:
+        img (PIL.Image): The image to get the mask from.
+        threshold (float): The threshold to use.
+        model_selection (int): The model to use.
+        
+    Returns:
+        image_seg_mask (PIL.Image): The mask of the person.
+        composite (PIL.Image): The masked image.
+        image_seg_maskRaw (np.array): The raw mask.
+        
+    
+    """
     import numpy as np
     
     mp_selfie_segmentation = mp.solutions.selfie_segmentation
     segment = mp_selfie_segmentation.SelfieSegmentation(model_selection = model_selection)
     baseFaceImage = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     results = segment.process(baseFaceImage)
-    image_seg_mask = results.segmentation_mask
-    binary_mask = image_seg_mask > threshold
+    image_seg_maskRaw = results.segmentation_mask
+    binary_mask = image_seg_maskRaw > threshold
     image_seg_mask = PIL.Image.fromarray(binary_mask)
     
     import numpy as np
@@ -215,9 +344,56 @@ def GetSelfieBodyMask(img, threshold = 0.5 , model_selection = 0):
     
     composite = PIL.Image.fromarray( cv2.cvtColor(composite, cv2.COLOR_BGR2RGB))
     
-    return image_seg_mask, composite
+    return image_seg_mask, composite, image_seg_maskRaw
+
+def GetGroupSelfieBodyMask(img, threshold = 0.5 , depthThreshold = 0.8 , depthMax = 1 ,maskFeather=1, model_selection = 0, maxSize = 0):
+    
+    """
+    Get a mask of a group of people in a selfie.
+    
+    Args:
+        img (PIL.Image): The image to get the mask from.
+        threshold (float): The threshold to use.
+        depthThreshold (float): The depth threshold to use.
+        depthMax (float): The depth max to use.
+        maskFeather (int): The mask feather to use.
+        model_selection (int): The model to use. 0 - 1. 1 is more accurate.
+        maxSize (int): The max size to use.
+        
+        
+    Returns:
+        outImage (PIL.Image): The masked image of the people.
+        baseimg (PIL.Image): The input image.
+        imageMask (np.array): The raw mask.
+    """
+    
+    baseimg = img
+    if maxSize != 0:
+        baseimg = ResizeImage(img, maxSize)
+
+    imageMask, comp, imageMaskRaw = GetSelfieBodyMask(baseimg, threshold,model_selection)
+    clamped, clampDepthImage, normalizedZeroOne = ClampDepth(imageMaskRaw, depthThreshold, depthMax)
+    mask_blur = clamped.filter(ImageFilter.GaussianBlur(maskFeather))
+    b1 = PILToCV2(baseimg.convert("RGBA"),cv2.COLOR_RGBA2BGRA)
+    b2 = PILToCV2(mask_blur.convert("RGBA"),cv2.COLOR_RGBA2BGRA)
+    b22 = b2[:,:,3]
+    outImage = AddAlphaToCV2Image(b1,b22,cv2.COLOR_RGBA2BGRA)
+    
+    return outImage, baseimg,imageMask
 
 def GetCannyEdges(img, mask = None, low_threshold = 50, high_threshold = 150):
+    """
+    Get the canny edges of an image.
+    
+    Args:
+        img (PIL.Image): The image to get the canny edges from.
+        mask (PIL.Image): The mask to use.
+        low_threshold (int): The low threshold to use.
+        high_threshold (int): The high threshold to use.
+    
+    Returns:
+        canny_image (PIL.Image): The canny edges of the image.
+    """
     import cv2
     import numpy as np
     import cv2
@@ -292,7 +468,7 @@ def imageGrid(imgs, rows, maxWidth = 1080):
     grid = grid.resize((maxWidth, int(grid_h/grid_w*maxWidth)))
     return grid
 
-def AugmentFaceCustomSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", textualInversion="justinjaro_lora\johnsmith.bin", customSDBin="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42, steps=25):
+def AugmentFaceCustomSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", textualInversion="justinjaro_lora/johnsmith.bin", customSDBin="justinjaro_lora/pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42, steps=25):
     baseFaceImage = np.array(pilImg)
     selfieMask, person = GetSelfieBodyMask(baseFaceImage)
     facemask, faceMasked = ExtractFace(baseFaceImage)
@@ -311,7 +487,7 @@ def AugmentFaceCustomSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",c
         outimages.append(appliedFace)
     return outimages, selfieMask,  facemask
 
-def AugmentFaceSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", loraPath="justinjaro_lora\pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42):
+def AugmentFaceSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRepo="lllyasviel/sd-controlnet-canny", loraPath="justinjaro_lora/pytorch_lora_weights.bin", prompt_="portrait+ style A photo of ", negPrompt_=" blurry, high contrast, hdr", imagesToGenerate=4, maskFeather = 2, seed =42):
     baseFaceImage = np.array(pilImg)
     selfieMask, person = GetSelfieBodyMask(baseFaceImage)
     facemask, faceMasked = ExtractFace(baseFaceImage)
@@ -361,9 +537,8 @@ def CropFace(cv2image, padding = 200, size = (256, 256)):
     except:
         return None
     
-def CreateFaceDataset(inputSearchPattern = "johnSmith\johnSmith*.jpg", outputImageDir = "johnSmith\output", prefix = "johnSmith", padding = 200, size = (512, 512)):
-    import glob
-    import os
+def CreateFaceDataset(inputSearchPattern = "johnSmith/johnSmith*.jpg", outputImageDir = "johnSmith/output", prefix = "johnSmith", padding = 200, size = (512, 512)):
+
     inputImageDir = glob.glob(inputSearchPattern)
     if not os.path.exists(outputImageDir):
         os.makedirs(outputImageDir)
@@ -373,11 +548,11 @@ def CreateFaceDataset(inputSearchPattern = "johnSmith\johnSmith*.jpg", outputIma
         faceROI = CropFace(n, padding, size)
         if isinstance( faceROI, np.ndarray):
             newimage = CV2ToPIL(faceROI)
-            newimage.save(f"{outputImageDir}\{prefix}_{str(indx).zfill(4)}.png")
+            newimage.save(f"{outputImageDir}/{prefix}_{str(indx).zfill(4)}.png")
 
 
     
-def GetFace(filePath = "johnSmith\johnSmith*.jpg", padding = 200, size = (512, 512)):
+def GetFace(filePath = "johnSmith/johnSmith*.jpg", padding = 200, size = (512, 512)):
     n= cv2.imread(filePath)
     faceROI = CropFace(n, padding, size)
     if isinstance( faceROI, np.ndarray):
@@ -459,6 +634,12 @@ def Base64StringToPILImage(base64String):
 def uaiPromptImageJSONObjectToPILImage(promptImage):
     '''
     Takes a prompt image from the UAI API and returns a PIL image
+    
+    Args:
+        promptImage (dict): A prompt image from the UAI API
+    
+    Returns:
+        PIL.Image: A PIL image
     '''
     return Base64StringToPILImage(promptImage["media"])
 
@@ -482,11 +663,171 @@ def saveUAIPromptMultiImageJSONObjectToFiles(promptImages, filepath):
 
 def saveUAIPromptImageJSONObjectToFiles(promptImage, filepath):
     '''
-    Takes a prompt image from the UAI API and returns a PIL image
+    Save the image to file
+    
+    Args:
+        promptImage (dict): A prompt image from the UAI API
+        filepath (str): The path to save the image to
+    
+    Returns:
+        PIL.Image: A PIL image
     '''
     piImage = Base64StringToPILImage(promptImage["media"])
     piImage.save(filepath)
     return piImage
 
+def GenerateDepthImage(pilImage):
+    """
+    Generate a depth image from a mono image
+    
+    Args:
+        pilImage (PIL.Image): A PIL image
+    
+    Returns:
+        depth (PIL.Image): The depth image
+        output (np.array): The depth image as a numpy array
+    """
+    processor = DPTImageProcessor.from_pretrained("Intel/dpt-large")
+    model = DPTForDepthEstimation.from_pretrained("Intel/dpt-large")
+
+    # prepare image for the model
+    inputs = processor(images=pilImage, return_tensors="pt")
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        predicted_depth = outputs.predicted_depth
+
+    # interpolate to original size
+    prediction = torch.nn.functional.interpolate(
+        predicted_depth.unsqueeze(1),
+        size=pilImage.size[::-1],
+        mode="bicubic",
+        align_corners=False,
+    )
+
+    # visualize the prediction
+    output = prediction.squeeze().cpu().numpy()
+    normalized = NormalizeNumpyArray(output)
+    conv = ConvertNumpyArrayToImage(normalized)
+    depth = CV2ToPIL(conv)
+    return depth, output
+
+def NormalizeNumpyArray(numpyArray):
+    """
+    Normalize a numpy array to 0-1
+    
+    Args:
+        numpyArray (np.array): A numpy array
+    
+    Returns:
+        np.array: The normalized numpy array
+    """
+    normalizedNumpy = (numpyArray - np.min(numpyArray)) / (np.max(numpyArray) - np.min(numpyArray))
+    normalizedZeroOne = (normalizedNumpy-np.min(normalizedNumpy))/(np.max(normalizedNumpy)-np.min(normalizedNumpy))
+    return normalizedZeroOne
+
+def ConvertNumpyArrayToImage(numpyArray, processType = "uint8"):
+    """
+    Convert a numpy array to an image
+    
+    Args:
+        numpyArray (np.array): A numpy array
+        processType (str, optional): The type to convert to. Defaults to "uint8".
+        
+    Returns:
+        np.array: The converted numpy array
+    """
+    return (numpyArray * 255 / np.max(numpyArray)).astype(processType)
+
+def ClampDepth(rawDepth,thresholdAdd = 0.2 , maxDepth = 1):
+    """
+    Clamp a depth image
+    
+    Args:
+        rawDepth (np.array): A depth image
+        thresholdAdd (float, optional): The threshold to add.
+        maxDepth (int, optional): The max depth.
+        
+    Returns:
+        pilImage (PIL.Image): The clamped depth image
+        normalizedNumpy (np.array): The normalized numpy array
+        alpha (np.array): The alpha numpy array
+        
+        
+    
+    """
+    # Normalize and Threshold the depth mask
+    normalizedNumpy = (rawDepth - np.min(rawDepth)) / (np.max(rawDepth) - np.min(rawDepth))
+    normalizedZeroOne = (normalizedNumpy-np.min(normalizedNumpy))/(np.max(normalizedNumpy)-np.min(normalizedNumpy))
+    
+    threshold = np.min(normalizedNumpy[normalizedZeroOne > 0]) + thresholdAdd
+    cleaned = np.where(normalizedNumpy > threshold, normalizedNumpy, 0)
+    cleaned = np.where(cleaned > maxDepth, maxDepth, cleaned)
+    clampedCleaned = np.interp(cleaned, (cleaned.min(), cleaned.max()), (0, maxDepth))
+
+    # Convert to 8-bit 255
+    formatted = (clampedCleaned * 255 / np.max(clampedCleaned)).astype("uint8")
+    alpha = (clampedCleaned * 255 / np.max(clampedCleaned)).astype("uint8")
+
+    # Apply Alpha
+    pilImage = CV2ToPIL(formatted, cv2.COLOR_GRAY2RGBA)
+    alphaPil = PILToCV2(pilImage, cv2.COLOR_RGBA2BGRA)
+    alphaPil[:, :, 3] = alpha
+    pilImage = CV2ToPIL(alphaPil, cv2.COLOR_BGRA2RGBA)
+    return pilImage, normalizedZeroOne, alpha
 
 
+
+def AddAlphaToCV2Image(baseimgCV2, maskCV2, baseImageColorpsace = cv2.COLOR_RGBA2BGRA):
+    alphaPil = baseimgCV2
+    alphaPil[:, :, 3] = maskCV2
+    pilImage = CV2ToPIL(alphaPil, cv2.COLOR_BGRA2RGBA)
+    return pilImage
+    
+def ClampImageByDepth(imagePath, threshold = 0.2, maxDepth = 1 , maskFeather=0.2):
+    """
+    Clamp an image by generate depth
+    
+    Args:
+        imagePath (str | PIL.Image): The path OR PIL Image to the image
+        threshold (float, optional): The threshold to add
+        maxDepth (int, optional): The max depth
+        maskFeather (float, optional): The mask feather
+        
+    Returns:
+        pilImage (PIL.Image): The clamped image
+        clampDepthImage (PIL.Image): The clamped depth image
+        normalizedZeroOne (np.array): The normalized numpy array
+    """
+    baseimg = imagePath
+    if isinstance(imagePath, str):
+        baseimg = Image.open(imagePath)
+    img, raw = GenerateDepthImage(baseimg)
+    clampDepthImage, normalizedZeroOne, alpha = ClampDepth(raw, threshold, maxDepth)
+    mask_blur = clampDepthImage.filter(ImageFilter.GaussianBlur(maskFeather))
+    maskAlpha = PILToCV2(mask_blur, cv2.COLOR_RGBA2GRAY)
+    # Apply Alpha
+    alphaPil = PILToCV2(baseimg, cv2.COLOR_RGBA2BGRA)
+    alphaPil[:, :, 3] = maskAlpha
+    pilImage = CV2ToPIL(alphaPil, cv2.COLOR_BGRA2RGBA)
+    return pilImage, clampDepthImage, normalizedZeroOne
+
+def ResizeImage(pilImage, maxWidth = 700):
+    """
+    Resize an image based on max width
+    
+    Args:
+        pilImage (PIL.Image): A PIL image
+        maxWidth (int, optional): The max width
+    
+    Returs:
+        pilImage (PIL.Image): The resized PIL image
+    
+    """
+    width, height = pilImage.size
+    if width > maxWidth:
+        pilImage = pilImage.resize((maxWidth, int(height * maxWidth / width)))
+    else:
+        newHeight = int(height * maxWidth / width)
+        pilImage = pilImage.resize((maxWidth, newHeight))
+    return pilImage

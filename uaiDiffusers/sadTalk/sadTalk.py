@@ -51,6 +51,17 @@ class sadTalkArgs:
         self.z_far = 15.0
     
     def fromJson(self, jsonData):
+        """
+        Load data from a json object
+        Example:
+            >>> args = sadTalkArgs()
+            >>> args.fromJson(jsonData)
+        Args:
+            jsonData (dict): A dictionary containing the data to load
+        Returns:
+            None
+        
+        """
         self.driven_audio = jsonData['driven_audio']
         self.source_image = jsonData['source_image']
         self.outputPath = jsonData['outputPath']
@@ -119,8 +130,7 @@ def AnimateFaceWithAudio(args):
     first_frame_dir = os.path.join(save_dir, 'first_frame_dir')
     os.makedirs(first_frame_dir, exist_ok=True)
     print('3DMM Extraction for source image')
-    first_coeff_path, crop_pic_path, crop_info =  preprocess_model.generate(pic_path, first_frame_dir, args.preprocess,\
-                                                                             source_image_flag=True, pic_size=args.size)
+    first_coeff_path, crop_pic_path, crop_info =  preprocess_model.generate(pic_path, first_frame_dir, args.preprocess, source_image_flag=True, pic_size=args.size)
     if first_coeff_path is None:
         print("Can't get the coeffs of the input")
         return

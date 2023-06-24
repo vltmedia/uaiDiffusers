@@ -10,7 +10,7 @@ def PruneList(inputList = [], maxImages = 100):
     return inputList
 
 
-def PruneFilesInFolder(inputDirectory = "johnSmith\johnSmithDataset", extension="png", maxImages = 100):
+def PruneFilesInFolder(inputDirectory = "johnSmith/johnSmithDataset", extension="png", maxImages = 100):
     import os
     import glob
     files = glob.glob(inputDirectory + "/*."+ extension)
@@ -19,7 +19,7 @@ def PruneFilesInFolder(inputDirectory = "johnSmith\johnSmithDataset", extension=
         os.remove(file)
     return files
     
-def ConvertDirectoryRGBAToRGB(inputDirectory = "johnSmith\johnSmithDataset", extension="png", replacementColor = (0,0,0,255)):
+def ConvertDirectoryRGBAToRGB(inputDirectory = "johnSmith/johnSmithDataset", extension="png", replacementColor = (0,0,0,255)):
     import os
     import glob
     files = glob.glob(inputDirectory + "/*."+ extension)
