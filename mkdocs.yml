@@ -1,6 +1,7 @@
 site_name: "UAI Diffusers"
 nav:
   - "Home": index.md
+  - "Classes": classes.md
   - "uaiDiffusers": uaiDiffusers.md
   - "sadTalk": sadtalk.md
   - "hair": hair.md
