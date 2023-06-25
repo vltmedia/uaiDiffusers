@@ -18,7 +18,7 @@ from transformers import pipeline, DPTImageProcessor, DPTForDepthEstimation
 import glob
 import os
 import uaiDiffusers.hair as hair
-from uaiDiffusers.classes.mediaRequestBase64 import MediaRequestBase64, MultipleMediaRequest
+from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 
 def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
     """
@@ -710,19 +710,20 @@ def saveUAIPromptImageJSONObjectToFiles(promptImage, filepath):
     piImage.save(filepath)
     return piImage
 
-def GenerateDepthImage(pilImage):
+def GenerateDepthImage(pilImage, modelName = "Intel/dpt-large"):
     """
     Generate a depth image from a mono image
     
     Args:
         pilImage (PIL.Image): A PIL image
+        modelName (str): The model name to use from Huggingface for the DPT model Depth Estimation.
     
     Returns:
         depth (PIL.Image): The depth image
         output (np.array): The depth image as a numpy array
     """
-    processor = DPTImageProcessor.from_pretrained("Intel/dpt-large")
-    model = DPTForDepthEstimation.from_pretrained("Intel/dpt-large")
+    processor = DPTImageProcessor.from_pretrained(modelName)
+    model = DPTForDepthEstimation.from_pretrained(modelName)
 
     # prepare image for the model
     inputs = processor(images=pilImage, return_tensors="pt")
