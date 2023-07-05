@@ -648,7 +648,7 @@ def MultiImagesToFlaskResponse(pilImages, prompts):
     '''
     # return the pilImage as an image
     
-    MultipleMediaRequest_ = MultipleMediaRequest()
+    MultipleMediaRequest_ = MultipleMediaRequest([])
     for indx, img in enumerate(pilImages):
         prompt = ""
         try:
@@ -657,7 +657,7 @@ def MultiImagesToFlaskResponse(pilImages, prompts):
             prompt = ""
         MultipleMediaRequest_.addMedia(MediaRequestBase64(ImagesToBase64(img), prompt))
         
-    return jsonify(MultipleMediaRequest_.toJson())
+    return jsonify(MultipleMediaRequest_.toDict())
 
 def Base64StringToPILImage(base64String):
     '''

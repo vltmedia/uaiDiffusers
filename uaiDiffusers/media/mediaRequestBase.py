@@ -33,6 +33,18 @@ class MultipleMediaRequest:
         """
         self.media.append(media)
         
+    def toDict(self):
+        """
+        Convert the object to a json string
+        
+        Returns:
+            str: The json string
+        """
+        media = []
+        for m in self.media:
+            media.append(m.__dict__)
+        return {"media":media}
+        
     def toJson(self):
         """
         Convert the object to a json string
@@ -40,4 +52,4 @@ class MultipleMediaRequest:
         Returns:
             str: The json string
         """
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+        return json.dumps(self, default=lambda o: o.__dict__)
