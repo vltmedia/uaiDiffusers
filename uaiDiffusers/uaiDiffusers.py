@@ -657,7 +657,7 @@ def MultiImagesToFlaskResponse(pilImages, prompts):
             prompt = ""
         MultipleMediaRequest_.addMedia(MediaRequestBase64(ImagesToBase64(img), prompt))
         
-    return jsonify(MultipleMediaRequest_.toJSON())
+    return jsonify(MultipleMediaRequest_.toJson())
 
 def Base64StringToPILImage(base64String):
     '''
