@@ -1,24 +1,27 @@
+import time
+import json
+from importTime.importTime import startTotal, endTotal
+
+startTotal()
+# startImport()
 import numpy as np
 import torch
 from PIL import Image, ImageFilter
 import PIL
-import mediapipe as mp
-import numpy as np
-from transformers import AutoImageProcessor, UperNetForSemanticSegmentation
-from diffusers import ControlNetModel, UniPCMultistepScheduler, DPMSolverMultistepScheduler
-from diffusers.utils import load_image
-from diffusers import StableDiffusionControlNetPipeline, StableDiffusionPipeline
+# from transformers import AutoImageProcessor, UperNetForSemanticSegmentation
+
 import cv2
 import zipfile
 import io
 import flask
-import base64
 from flask import jsonify
-from transformers import pipeline, DPTImageProcessor, DPTForDepthEstimation
+
+import base64
 import glob
 import os
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
+endTotal()
 
 def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
     """
@@ -44,6 +47,9 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
         
     
     """
+    
+    from diffusers import ControlNetModel, DPMSolverMultistepScheduler, StableDiffusionControlNetPipeline, StableDiffusionPipeline
+    from diffusers.utils import load_image
     
     if isinstance(inputFaceImage, str):
         inputFaceImage = load_image(inputFaceImage)
@@ -121,6 +127,7 @@ def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", tex
     """
     
     # image = Image.fromarray(image)
+    from diffusers import StableDiffusionPipeline
   
     if pipe_ is None:
         pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
@@ -230,6 +237,8 @@ def ExtractFace(pilImage):
         face (PIL.Image): The extracted face.
         
     """
+    import mediapipe as mp
+    
     import numpy as np
     mp_face_mesh = mp.solutions.face_mesh
     face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True)
@@ -328,6 +337,7 @@ def GetSelfieBodyMask(img, threshold = 0.5 , model_selection = 0):
     
     """
     import numpy as np
+    import mediapipe as mp
     
     mp_selfie_segmentation = mp.solutions.selfie_segmentation
     segment = mp_selfie_segmentation.SelfieSegmentation(model_selection = model_selection)
@@ -503,6 +513,8 @@ def AugmentFaceSDControlnetFace(pilImg, sdRepo="wavymulder/portraitplus",cannyRe
 
 def CropFace(cv2image, padding = 200, size = (256, 256)):
     # convert to RGB
+    import mediapipe as mp
+    
     (height, width) = cv2image.shape[:2]
     newImage = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
     newImage = cv2.resize(newImage, (height + padding, width + padding))
@@ -722,6 +734,7 @@ def GenerateDepthImage(pilImage, modelName = "Intel/dpt-large"):
         depth (PIL.Image): The depth image
         output (np.array): The depth image as a numpy array
     """
+    from transformers import pipeline, DPTImageProcessor, DPTForDepthEstimation
     processor = DPTImageProcessor.from_pretrained(modelName)
     model = DPTForDepthEstimation.from_pretrained(modelName)
 
