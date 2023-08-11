@@ -887,12 +887,17 @@ def ResizeImage(pilImage, maxWidth = 700):
 
 def upload_file_to_space(spaces_client, space_name, file_src, save_as, **kwargs):
     """
-    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
-    :param space_name: Unique name of your space. Can be found at your digitalocean panel
-    :param file_src: File location on your disk
-    :param save_as: Where to save your file in the space
-    :param kwargs
-    :return:
+    Upload a file to a Digital Ocean Space
+    
+    Args:
+        spaces_client (client): Your DigitalOcean Spaces client from get_spaces_client()
+        space_name (str): Unique name of your space. Can be found at your digitalocean panel
+        file_src(str): File location on your disk
+        save_as(str): Where to save your file in the space
+    
+    Returns:
+        aws response
+    
     """
 
     is_public = kwargs.get("is_public", False)
@@ -925,14 +930,22 @@ def upload_file_to_space(spaces_client, space_name, file_src, save_as, **kwargs)
 
 
 def upload_pil_to_space(spaces_client, space_name, pilImage, save_as, **kwargs):
+    
     """
-    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
-    :param space_name: Unique name of your space. Can be found at your digitalocean panel
-    :param pilImage: File location on your disk
-    :param save_as: Where to save your file in the space
-    :param kwargs
-    :return:
+    Upload a PIL Image to a Digital Ocean Space
+    
+    Args:
+        pilImage (PIL.Image): A PIL image
+        spaces_client (client): Your DigitalOcean Spaces client from get_spaces_client()
+        space_name (str): Unique name of your space. Can be found at your digitalocean panel
+        file_src(str): File location on your disk
+        save_as(str): Where to save your file in the space
+    
+    Returns:
+        aws response
+    
     """
+
 
     # Save the image to an in-memory file
     in_mem_file = io.BytesIO()
@@ -959,12 +972,18 @@ def upload_pil_to_space(spaces_client, space_name, pilImage, save_as, **kwargs):
 
 def upload_bytes_array_to_space(spaces_client, space_name, file_body, save_as, **kwargs):
     """
-    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
-    :param space_name: Unique name of your space. Can be found at your digitalocean panel
-    :param file_body: Byte Array File
-    :param save_as: Where to save your file in the space
-    :param kwargs:
-    :return:
+    Upload a byte array to a Digital Ocean Space
+    
+    Args:
+        file_body (byte[]): The file as a byte array
+        spaces_client (client): Your DigitalOcean Spaces client from get_spaces_client()
+        space_name (str): Unique name of your space. Can be found at your digitalocean panel
+        file_src(str): File location on your disk
+        save_as(str): Where to save your file in the space
+    
+    Returns:
+        aws response
+    
     """
 
     is_public = kwargs.get("is_public", False)
@@ -987,6 +1006,28 @@ def upload_bytes_array_to_space(spaces_client, space_name, file_body, save_as, *
     return spaces_client.put_object(**args)
 
 def CreateNewMediaContent(name = "Untitled", url = "",user = 152, description = "", nsfw = False, remixable = True, metadata = "", tags = "AI", project = "", app = "", settings = "", visibility = "Public", views = 1):
+    """
+    Create a new media content object
+    
+    Args:
+        name (str, optional): The name of the media content
+        url (str, optional): The url of the media content
+        user (int, optional): The user id of the media content
+        description (str, optional): The description of the media content
+        nsfw (bool, optional): Is the media content nsfw
+        remixable (bool, optional): Is the media content remixable
+        metadata (str, optional): The metadata of the media content
+        tags (str, optional): The tags of the media content
+        project (str, optional): The project of the media content
+        app (str, optional): The app of the media content
+        settings (str, optional): The settings of the media content
+        visibility (str, optional): The visibility of the media content
+        views (int, optional): The views of the media content
+        
+    Returns:
+        dict: The media content object
+    """
+    
     media = {
 		"name": name,
 		"url": url,
@@ -1014,6 +1055,20 @@ def CreateNewMediaContent(name = "Untitled", url = "",user = 152, description = 
     return media
 
 def CreateJob(route, stringData,user,  organization = "0000000000", processingServer = "0000"):
+    """
+    Create a new UAI Job object
+    
+    Args:
+        route (str): The route of the job
+        stringData (str): The data of the job
+        user (str): The user id of the job
+        organization (str, optional): The organization id of the job
+        processingServer (str, optional): The processing server id of the job
+    
+    Returns:
+        dict: The UAI Job object
+    
+    """
     job = {"job": {
 		"addDate": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
 		"data": stringData,
@@ -1029,13 +1084,58 @@ def CreateJob(route, stringData,user,  organization = "0000000000", processingSe
     return job
 
 def AddJob(job):
+    """
+    Add a new UAI Job to the database
+    
+    Args:
+        job (dict): The UAI Job object
+    Returns:
+        dict: The UAI Response object
+        
+    """
     request = requests.post("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendaddjob", json=job)
     return request.json()
 
 def GetAUserStrapiID(user):
+    """
+    Get a User Strapi ID from an Auth0 ID
+    
+    Args:
+        user (str): The Auth0 ID of the user
+    Returns:
+        str: The Strapi ID of the user
+    
+    """
     request = requests.get("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendgetuserstrapiid/",json = {"user":user})
     return request.json()['user']
 
 def AddMediaContent(mediaContent, jwt):
+    """
+    Add a new media content object to the database.
+    
+    Args:
+        mediaContent (dict): The media content object
+        jwt (str): The jwt of the user
+    Returns:
+        dict: The UAI Response object with the media content id included
+    
+    """
     request = requests.post("http://68.183.115.32:1337/media-contents",json = mediaContent, headers={"Authorization": "Bearer "+jwt})
     return request.json()
+
+def AddNewMediaContent(route, stringData,user,  jwt,  organization = "0000000000", processingServer = "0000"):
+    """
+    Add and create a new Media Content object and add it to the database.
+    
+    Args:
+        route (str): The route of the job
+        stringData (str): The data of the job
+        user (str): The user id of the job
+        jwt (str): The jwt of the user
+        organization (str, optional): The organization id of the job
+        processingServer (str, optional): The processing server id of the job
+        
+    Returns:
+        dict: The UAI Response object with the media content id included
+    """
+    return AddMediaContent(CreateJob(route, stringData,user,  organization = organization, processingServer = processingServer), jwt)
