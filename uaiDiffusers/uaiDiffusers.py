@@ -986,6 +986,33 @@ def upload_bytes_array_to_space(spaces_client, space_name, file_body, save_as, *
 
     return spaces_client.put_object(**args)
 
+def CreateNewMediaContent(name = "Untitled", url = "",user = 152, description = "", nsfw = False, remixable = True, metadata = "", tags = "AI", project = "", app = "", settings = "", visibility = "Public", views = 1):
+    media = {
+		"name": name,
+		"url": url,
+		"description": description,
+		"nsfw": nsfw,
+		"remixable": remixable,
+		"user": {
+			"id": user,
+        },
+		"metadata": metadata,
+		"tags": tags,
+		"project": project,
+		"app": app,
+		"settings": settings,
+		"Visibility": visibility,
+		"views": views,
+		"Comments": [],
+		"achievements": [],
+		"playlists": [
+		],
+		"upvotes": [
+		],
+		"favs": []
+	}
+    return media
+
 def CreateJob(route, stringData,user,  organization = "0000000000", processingServer = "0000"):
     job = {"job": {
 		"addDate": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
@@ -1003,4 +1030,12 @@ def CreateJob(route, stringData,user,  organization = "0000000000", processingSe
 
 def AddJob(job):
     request = requests.post("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendaddjob", json=job)
+    return request.json()
+
+def GetAUserStrapiID(user):
+    request = requests.get("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendgetuserstrapiid/",json = {"user":user})
+    return request.json()['user']
+
+def AddMediaContent(mediaContent, jwt):
+    request = requests.post("http://68.183.115.32:1337/media-contents",json = mediaContent, headers={"Authorization": "Bearer "+jwt})
     return request.json()
