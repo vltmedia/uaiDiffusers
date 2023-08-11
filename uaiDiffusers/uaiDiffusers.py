@@ -1,6 +1,6 @@
 import time
 import json
-from importTime.importTime import startTotal, endTotal
+from importTime import startTotal, endTotal
 
 startTotal()
 # startImport()
@@ -15,10 +15,13 @@ import zipfile
 import io
 import flask
 from flask import jsonify
+import io
+import requests
 
 import base64
 import glob
 import os
+import mimetypes
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 endTotal()
@@ -879,3 +882,125 @@ def ResizeImage(pilImage, maxWidth = 700):
         newHeight = int(height * maxWidth / width)
         pilImage = pilImage.resize((maxWidth, newHeight))
     return pilImage
+
+
+
+def upload_file_to_space(spaces_client, space_name, file_src, save_as, **kwargs):
+    """
+    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
+    :param space_name: Unique name of your space. Can be found at your digitalocean panel
+    :param file_src: File location on your disk
+    :param save_as: Where to save your file in the space
+    :param kwargs
+    :return:
+    """
+
+    is_public = kwargs.get("is_public", False)
+    content_type = kwargs.get("content_type")
+    meta = kwargs.get("meta")
+    if not content_type:
+        file_type_guess = mimetypes.guess_type(file_src)
+
+        if not file_type_guess[0]:
+            raise Exception("We can't identify content type. Please specify directly via content_type arg.")
+
+        content_type = file_type_guess[0]
+
+    extra_args = {
+        'ACL': "public-read-write",
+        'ContentType': content_type
+    }
+
+    if isinstance(meta, dict):
+        extra_args["Metadata"] = meta
+
+    return spaces_client.upload_file(
+        os.path.abspath(file_src),
+        space_name,
+        save_as,
+
+        # boto3.s3.transfer.S3Transfer.ALLOWED_UPLOAD_ARGS
+        ExtraArgs=extra_args
+    )
+
+
+def upload_pil_to_space(spaces_client, space_name, pilImage, save_as, **kwargs):
+    """
+    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
+    :param space_name: Unique name of your space. Can be found at your digitalocean panel
+    :param pilImage: File location on your disk
+    :param save_as: Where to save your file in the space
+    :param kwargs
+    :return:
+    """
+
+    # Save the image to an in-memory file
+    in_mem_file = io.BytesIO()
+    pilImage.save(in_mem_file, format=pilImage.format)
+    in_mem_file.seek(0)
+    content_type = "image/jpeg"
+    meta = kwargs.get("meta")
+    extra_args = {
+        'ACL': "public-read-write",
+        'ContentType': content_type
+    }
+
+    if isinstance(meta, dict):
+        extra_args["Metadata"] = meta
+
+    return spaces_client.upload_fileobj(
+        in_mem_file,
+        space_name,
+        save_as,
+
+        # boto3.s3.transfer.S3Transfer.ALLOWED_UPLOAD_ARGS
+        ExtraArgs=extra_args
+    )
+
+def upload_bytes_array_to_space(spaces_client, space_name, file_body, save_as, **kwargs):
+    """
+    :param spaces_client: Your DigitalOcean Spaces client from get_spaces_client()
+    :param space_name: Unique name of your space. Can be found at your digitalocean panel
+    :param file_body: Byte Array File
+    :param save_as: Where to save your file in the space
+    :param kwargs:
+    :return:
+    """
+
+    is_public = kwargs.get("is_public", False)
+    content_type = kwargs.get("content_type")
+    meta = kwargs.get("meta")
+
+    args = {
+        "Bucket": space_name,
+        "Body": file_body,
+        "Key": save_as,
+        "ACL": "public-read"
+    }
+
+    if content_type:
+        args["ContentType"] = content_type
+
+    if isinstance(meta, dict):
+        args["Metadata"] = meta
+
+    return spaces_client.put_object(**args)
+
+def CreateJob(route, stringData,user,  organization = "0000000000", processingServer = "0000"):
+    job = {"job": {
+		"addDate": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+		"data": stringData,
+		"finishedDate": "1999-02-01T00:00:00.000Z",
+		"jobID": "SP3N209YWR",
+		"organization": organization,
+		"processingServer": processingServer,
+		"route": route,
+		"status": "waiting",
+		"user": user,
+	"progress":0
+	}}
+    return job
+
+def AddJob(job):
+    request = requests.post("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendaddjob", json=job)
+    return request.json()
