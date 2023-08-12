@@ -1096,6 +1096,26 @@ def AddJob(job):
     request = requests.post("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendaddjob", json=job)
     return request.json()
 
+def AddCreateJob(route, stringData,user,  organization = "0000000000", processingServer = "0000"):
+    """
+    Add and Create a new UAI Job object
+    
+    Args:
+        route (str): The route of the job
+        stringData (str): The data of the job
+        user (str): The user id of the job
+        organization (str, optional): The organization id of the job
+        processingServer (str, optional): The processing server id of the job
+    
+    Returns:
+        dict: The UAI Job object
+    
+    """
+    job = AddJob(CreateJob(route, stringData,user,  organization , processingServer ))
+    return job
+
+
+
 def GetAUserStrapiID(user):
     """
     Get a User Strapi ID from an Auth0 ID
@@ -1123,19 +1143,18 @@ def AddMediaContent(mediaContent, jwt):
     request = requests.post("http://68.183.115.32:1337/media-contents",json = mediaContent, headers={"Authorization": "Bearer "+jwt})
     return request.json()
 
-def AddNewMediaContent(route, stringData,user,  jwt,  organization = "0000000000", processingServer = "0000"):
+def AddNewMediaContent(url,route, stringData,user,  jwt):
     """
     Add and create a new Media Content object and add it to the database.
     
     Args:
+        url (str): Filepath of the file in the space
         route (str): The route of the job
         stringData (str): The data of the job
         user (str): The user id of the job
         jwt (str): The jwt of the user
-        organization (str, optional): The organization id of the job
-        processingServer (str, optional): The processing server id of the job
         
     Returns:
         dict: The UAI Response object with the media content id included
     """
-    return AddMediaContent(CreateJob(route, stringData,user,  organization = organization, processingServer = processingServer), jwt)
+    return AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0), jwt)
