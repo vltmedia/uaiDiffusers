@@ -9,6 +9,7 @@ import torch
 from PIL import Image, ImageFilter
 import PIL
 # from transformers import AutoImageProcessor, UperNetForSemanticSegmentation
+import uuid
 
 import cv2
 import zipfile
@@ -1088,6 +1089,7 @@ def CreateJob(route, stringData,user,  jobID = "",  organization = "0000000000",
 		"organization": organization,
 		"processingServer": processingServer,
 		"route": route,
+		"output":[],
 		"status": "waiting",
 		"user": user,
 	"progress":0
@@ -1122,7 +1124,9 @@ def AddCreateJob(route, stringData,user,  organization = "0000000000", processin
         dict: The UAI Job object
     
     """
-    job = AddJob(CreateJob(route, stringData,user,  organization , processingServer ))
+    randomID = str(uuid.uuid4())
+    job = CreateJob(route, stringData,user,randomID,  organization , processingServer )
+    AddJob(job)
     return job
 
 
@@ -1168,4 +1172,7 @@ def AddNewMediaContent(url,route, stringData,user,  jwt):
     Returns:
         dict: The UAI Response object with the media content id included
     """
-    return AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0), jwt)
+    media =  AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0), jwt)
+    userID = media['user']['id']
+    media['user'] = { "id" : userID}
+    return media
