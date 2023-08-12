@@ -1053,8 +1053,17 @@ def CreateNewMediaContent(name = "Untitled", url = "",user = 152, description = 
 		"favs": []
 	}
     return media
-
-def CreateJob(route, stringData,user,  organization = "0000000000", processingServer = "0000"):
+def GenerateJobID():
+    """
+    Generate a new job id
+    
+    Returns:
+        str: The job id
+    """
+    url = "https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendgeneratejobcode"
+    
+    return requests.get(url).json()["jobCode"]
+def CreateJob(route, stringData,user,  jobID = "",  organization = "0000000000", processingServer = "0000"):
     """
     Create a new UAI Job object
     
@@ -1069,11 +1078,13 @@ def CreateJob(route, stringData,user,  organization = "0000000000", processingSe
         dict: The UAI Job object
     
     """
+    url = "https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendgeneratejobcode"
+    
     job = {"job": {
 		"addDate": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
 		"data": stringData,
 		"finishedDate": "1999-02-01T00:00:00.000Z",
-		"jobID": "SP3N209YWR",
+		"jobID": jobID if jobID != "" else GenerateJobID(),
 		"organization": organization,
 		"processingServer": processingServer,
 		"route": route,
