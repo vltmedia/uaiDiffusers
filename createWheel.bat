@@ -7,3 +7,4 @@ rmdir /s /q build
 
 call %UAI_PATH_%\Scripts\pip.exe install dist\uaiDiffusers-1.1.2-py2.py3-none-any.whl --force-reinstall
 call installWheelBrain.bat
+call installWheelProgramData.bat

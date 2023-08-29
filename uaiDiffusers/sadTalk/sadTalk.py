@@ -4,7 +4,10 @@ import torch
 from time import  strftime
 import os, sys, time
 from argparse import ArgumentParser
+import numpy as np
 
+np.float = float  
+np.complex = complex  
 from sadTalksrc.utils.preprocess import CropAndExtract
 from sadTalksrc.test_audio2coeff import Audio2Coeff  
 from sadTalksrc.facerender.animate import AnimateFromCoeff
@@ -109,9 +112,9 @@ def AnimateFaceWithAudio(args):
     pose_style = args.pose_style
     device = args.device
     batch_size = args.batch_size
-    input_yaw_list = args.input_yaw
-    input_pitch_list = args.input_pitch
-    input_roll_list = args.input_roll
+    input_yaw_list = args.input_yaw if args.input_yaw != [] else None
+    input_pitch_list = args.input_pitch if args.input_pitch != [] else None
+    input_roll_list = args.input_roll if args.input_roll != [] else None
     ref_eyeblink = args.ref_eyeblink
     ref_pose = args.ref_pose
 
@@ -135,7 +138,7 @@ def AnimateFaceWithAudio(args):
         print("Can't get the coeffs of the input")
         return
 
-    if ref_eyeblink is not None:
+    if ref_eyeblink !=  '':
         ref_eyeblink_videoname = os.path.splitext(os.path.split(ref_eyeblink)[-1])[0]
         ref_eyeblink_frame_dir = os.path.join(save_dir, ref_eyeblink_videoname)
         os.makedirs(ref_eyeblink_frame_dir, exist_ok=True)
@@ -144,7 +147,7 @@ def AnimateFaceWithAudio(args):
     else:
         ref_eyeblink_coeff_path=None
 
-    if ref_pose is not None:
+    if ref_pose != '':
         if ref_pose == ref_eyeblink: 
             ref_pose_coeff_path = ref_eyeblink_coeff_path
         else:
@@ -180,13 +183,13 @@ def AnimateFaceWithAudio(args):
         shutil.rmtree(save_dir)
         
 
-if __name__ == "__main__":
+def main():
     args = sadTalkArgs()
     args.driven_audio = "P:/datasets/Voices/voices/angie/2.wav"
     args.source_image = "F:/Temp/AI/image_0000.png"
     args.checkpoint_dir = "F:/Temp/AI/checkpoints"
     args.result_dir = 'F:/Temp/AI/results'
-    args.outputPath = 'F:/Temp/AI/results/img.mp4'
+    args.outputPath = 'F:/Temp/AI/results/img2.mp4'
     args.batch_size = 2
     args.size = 512
     args.expression_scale = 1.0
@@ -202,7 +205,15 @@ if __name__ == "__main__":
     args.camera_d = 10.0
     args.z_near = 5.0
     args.z_far = 15.0
+    args.z_far = 15.0
+    args.input_yaw = []
+    args.input_pitch = []
+    args.input_roll = []
+    args.ref_eyeblink = ''
+    args.ref_pose = ''
     import json
     file = open("outtext.json", "w")
     file.write(json.dumps(args.__dict__))
-    # AnimateFaceWithAudio(args)
+    AnimateFaceWithAudio(args)
+    
+main()

@@ -25,9 +25,36 @@ import os
 import mimetypes
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
+responseMessage = ""
 endTotal()
 
-def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None):
+
+def OptimizePipe(pipe, enableCPUOffload = False,enable_attention_slicing=False,enable_vae_tiling=False ):
+    if enableCPUOffload:
+        pipe.enable_model_cpu_offload()
+    if enable_attention_slicing:
+        pipe.enable_attention_slicing()
+    if enable_vae_tiling:
+        pipe.enable_vae_tiling()
+    return pipe
+
+
+def LoadCustomSDPipeFiles(pipe, loraPath = "", textualInversion = "",customSDBin = "" ):
+    if loraPath != "":
+        pipe.load_attn_procs(loraPath)
+    import os
+    
+    if customSDBin != "":   
+        pipe.unet.load_attn_procs(customSDBin)
+    if textualInversion != "":
+        pipe.load_textual_inversion(textualInversion)
+    return pipe
+
+def SetResponseMessage(message):
+    global responseMessage
+    responseMessage = message
+    
+def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffusion-v1-5", cannyRepo = "lllyasviel/sd-controlnet-canny", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", low_threshold = 100, high_threshold = 200, seed=42, pipe_ = None, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False):
     """
     Generates a face from a face image and a face mask using Stable Diffusion.
     
@@ -81,32 +108,28 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
         pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
     else:
         pass
-    if loraPath != "":
-        pipe.load_attn_procs(loraPath)
-    import os
     
-    if customSDBin != "":   
-        pipe.unet.load_attn_procs(customSDBin)
-    if textualInversion != "":
-        pipe.load_textual_inversion(textualInversion)
-        # pipe.load_textual_inversion(os.path.dirname(textualInversion), weight_name=os.path.basename(textualInversion))
-        # pipe.unet.load_attn_procs(os.path.dirname(customSDBin), weight_name=os.path.basename(customSDBin))
+    pipe = LoadCustomSDPipeFiles(pipe, loraPath, textualInversion, customSDBin)
 
     
     pipe = StableDiffusionControlNetPipeline(**pipe.components, controlnet=controlnet
     )
     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+    torch.manual_seed(seed)
+    
+    pipe = OptimizePipe(pipe,enableCPUOffload=enableCPUOffload, enable_attention_slicing=enable_attention_slicing, enable_vae_tiling=enable_vae_tiling)
+    
     # Remove if you do not have xformers installed
     # see https://huggingface.co/docs/diffusers/v0.13.0/en/optimization/xformers#installing-xformers
     # for installation instructions
     #pipe.enable_xformers_memory_efficient_attention()
 
-    pipe.enable_model_cpu_offload()
 
     images = pipe(prompt=prompt_, negative_prompt=negPrompt_, image=image, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, generator = generator).images
     return images
 
-def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, pipe_ = None):
+
+def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, textGuidance=7.5, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False, pipe_ = None):
     """
     Generate an image from a text prompt using Stable Diffusion.
     
@@ -123,6 +146,7 @@ def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", tex
         seed (int): The seed to use.
         width (int): The width of the image to generate.
         height (int): The height of the image to generate.
+        textGuidance (float): The scale to guide the image based on the text. The higher the closer it follows, but will look deep-fried.
         pipe_ (StableDiffusionPipeline): The Stable Diffusion pipeline to use. Set this to keep from reinitializing models.
         
     Returns:
@@ -137,27 +161,107 @@ def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", tex
         pipe = StableDiffusionPipeline.from_pretrained(sdRepo, torch_dtype=torch.float16, safety_checker=None)
     else:
         pipe = pipe_
-    if loraPath != "":
-        pipe.load_attn_procs(loraPath)
-    import os
-    
-    if customSDBin != "":   
-        pipe.unet.load_attn_procs(customSDBin)
-    if textualInversion != "":
-        pipe.load_textual_inversion(textualInversion)
-        # pipe.load_textual_inversion(os.path.dirname(textualInversion), weight_name=os.path.basename(textualInversion))
-        # pipe.unet.load_attn_procs(os.path.dirname(customSDBin), weight_name=os.path.basename(customSDBin))
-
-    generator = torch.Generator(device=device).manual_seed(seed)
-
+        
+    pipe = LoadCustomSDPipeFiles(pipe, loraPath, textualInversion, customSDBin)
+    torch.manual_seed(seed)
+    pipe = OptimizePipe(pipe,enableCPUOffload=enableCPUOffload, enable_attention_slicing=enable_attention_slicing, enable_vae_tiling=enable_vae_tiling)
     # Remove if you do not have xformers installed
     # see https://huggingface.co/docs/diffusers/v0.13.0/en/optimization/xformers#installing-xformers
     # for installation instructions
     #pipe.enable_xformers_memory_efficient_attention()
+    
 
-    pipe.enable_model_cpu_offload()
 
-    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, generator = generator, width = width, height= height).images
+    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, width = width, height= height, guidance_scale=textGuidance).images
+    return images
+
+
+def GenerateImageXL(sdRepo =  "stabilityai/stable-diffusion-xl-base-1.0", loraPath = "minimaxir/sdxl-wrong-lora", textualInversion = "",customSDBin = "", refinerRepo = "", vaeRepo = "madebyollin/sdxl-vae-fp16-fix", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=1024, height=1024, textGuidance=7.5,  high_noise_frac=0.8, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False):
+    """
+    Generate an XLimage from a text prompt using Stable Diffusion.
+    
+    Args:
+        sdRepo (str): The Stable Diffusion model to use.
+        loraPath (str): The path to the LoRA model to use.
+        textualInversion (str): The path to the textual inversion model to use. 
+        customSDBin (str): The path to the custom Stable Diffusion model to use.
+        refinerRepo (str): The path to the custom Stable Diffusion XL Refiner model to use.
+        vaeRepo (str): The path to the custom Stable Diffusion VAE model to use.
+        imagesToGenerate (int): The number of images to generate.
+        steps (int): The number of steps to use.
+        device (str): The device to use.
+        prompt_ (str): The prompt to use.
+        negPrompt_ (str): The negative prompt to use.
+        seed (int): The seed to use.
+        width (int): The width of the image to generate.
+        height (int): The height of the image to generate.
+        high_noise_frac (float): When to start denoising. default 0.8 .
+        textGuidance (float): The scale to guide the image based on the text. The higher the closer it follows, but will look deep-fried.
+        pipe_ (StableDiffusionPipeline): The Stable Diffusion pipeline to use. Set this to keep from reinitializing models.
+        
+    Returns:
+        images (list): A list of images generated.
+        
+    """
+    
+    # image = Image.fromarray(image)
+    from diffusers import AutoencoderKL, StableDiffusionXLPipeline, DiffusionPipeline
+  
+    vae = AutoencoderKL.from_pretrained(
+        vaeRepo,
+        torch_dtype=torch.float16
+    )
+    pipe = StableDiffusionXLPipeline.from_pretrained(
+        sdRepo, torch_dtype=torch.float16, variant="fp16", use_safetensors=True,vae=vae
+    )
+    
+    torch.manual_seed(seed)
+    pipe = OptimizePipe(pipe,enableCPUOffload=enableCPUOffload, enable_attention_slicing=enable_attention_slicing, enable_vae_tiling=enable_vae_tiling)
+    
+   
+    pipe.to(device)
+    pipe.load_lora_weights(loraPath)
+    if refinerRepo != "":
+        refiner = DiffusionPipeline.from_pretrained(
+            refinerRepo,
+            text_encoder_2=pipe.text_encoder_2,
+            vae=pipe.vae,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        )
+        refiner.to(device)
+
+    n_steps = steps
+    # n_steps = 40
+    torch.manual_seed(seed)
+    prompt = prompt_
+    # prompt = "A 3d render death metal album cover with Marilyn Monroe wearing Raybans while shooting a machine gun in a jungle. octane render. high quality. cinematic. aesthetic. award winning. hyper metal. 8k"
+    negativePrompt = "wrong . low quality. " + negPrompt_
+
+    image = pipe(prompt=prompt, negative_prompt=negativePrompt, num_inference_steps=n_steps,  guidance_scale=textGuidance, num_images_per_prompt= imagesToGenerate).images
+    outimages = []
+    for index, img in enumerate(image):
+        if refinerRepo != "":
+            image_ = refiner(
+                prompt=prompt,
+                num_inference_steps=n_steps,
+                denoising_start=high_noise_frac,
+                image=img
+            ).images[0]
+            outimages.append(image_)
+        else:
+            outimages.append(img)
+    return outimages
+   
+    # Remove if you do not have xformers installed
+    # see https://huggingface.co/docs/diffusers/v0.13.0/en/optimization/xformers#installing-xformers
+    # for installation instructions
+    #pipe.enable_xformers_memory_efficient_attention()
+    
+
+
+    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, width = width, height= height, guidance_scale=textGuidance).images
     return images
 
 def MaskOutGeneratedFace (generatedImage, mask_image):
@@ -675,6 +779,30 @@ def MultiImagesToFlaskResponse(pilImages, prompts):
         
     return jsonify(MultipleMediaRequest_.toDict())
 
+def MultiImagesToJSONResponse(pilImages, prompts):
+    '''
+    Takes a list of PIL images and prompts of the same count and returns a MultipleMediaRequest JSON object containing the images and prompts as MediaRequestBase64 objects
+    
+    Args:
+        pilImages (list): A list of PIL images
+        prompts (list): A list of prompts
+        
+    Returns:
+        JSONString (str): A MultipleMediaRequest JSON string
+    '''
+    # return the pilImage as an image
+    
+    MultipleMediaRequest_ = MultipleMediaRequest([])
+    for indx, img in enumerate(pilImages):
+        prompt = ""
+        try:
+            prompt = prompts[indx]
+        except:
+            prompt = ""
+        MultipleMediaRequest_.addMedia(MediaRequestBase64(ImagesToBase64(img), prompt))
+        
+    return json.dumps(MultipleMediaRequest_.toDict())
+
 def Base64StringToPILImage(base64String):
     '''
     Takes a base64 string and returns a PIL image
@@ -1144,21 +1272,22 @@ def GetAUserStrapiID(user):
     request = requests.get("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendgetuserstrapiid/",json = {"user":user})
     return request.json()['user']
 
-def AddMediaContent(mediaContent, jwt):
+def AddMediaContent(mediaContent):
     """
     Add a new media content object to the database.
     
     Args:
         mediaContent (dict): The media content object
-        jwt (str): The jwt of the user
     Returns:
         dict: The UAI Response object with the media content id included
     
     """
-    request = requests.post("http://68.183.115.32:1337/media-contents",json = mediaContent, headers={"Authorization": "Bearer "+jwt})
+    request = requests.post("https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-33d7e743-bdcf-4b28-8afd-5589d75e6700/uaibackend/uaibackendaddnewmediacontent",json = {"media":mediaContent})
+    print(request.reason)
+    print(request.status_code)
     return request.json()
 
-def AddNewMediaContent(url,route, stringData,user,  jwt):
+def AddNewMediaContent(url,route, stringData,user):
     """
     Add and create a new Media Content object and add it to the database.
     
@@ -1167,12 +1296,10 @@ def AddNewMediaContent(url,route, stringData,user,  jwt):
         route (str): The route of the job
         stringData (str): The data of the job
         user (str): The user id of the job
-        jwt (str): The jwt of the user
         
     Returns:
         dict: The UAI Response object with the media content id included
     """
-    media =  AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0), jwt)
-    userID = media['user']['id']
-    media['user'] = { "id" : userID}
+    media =  AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0))['media']
+    media['user'] = { "id" : user}
     return media
