@@ -27,6 +27,22 @@ import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 responseMessage = ""
 endTotal()
+CLRMaxSteps = 20
+def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
+    from System import PythonCLR
+    PythonCLR.SendProgress(progress, message, done)
+
+def CLRProgressCallback(step, timeScale, tensor):
+        global CLRMaxSteps
+        from System import PythonCLR
+        percent = step / CLRMaxSteps
+        PythonCLR.SendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
+        
+
+def SetCLRMaxSteps(steps):
+        global CLRMaxSteps
+        CLRMaxSteps = steps
+        
 
 
 def OptimizePipe(pipe, enableCPUOffload = False,enable_attention_slicing=False,enable_vae_tiling=False ):
@@ -128,8 +144,7 @@ def GenerateFace(inputFaceImage, inputFaceMask, sdRepo =  "runwayml/stable-diffu
     images = pipe(prompt=prompt_, negative_prompt=negPrompt_, image=image, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, generator = generator).images
     return images
 
-
-def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, textGuidance=7.5, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False, pipe_ = None):
+def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", textualInversion = "",customSDBin = "", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=512, height=512, textGuidance=7.5, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False,callback = None, pipe_ = None):
     """
     Generate an image from a text prompt using Stable Diffusion.
     
@@ -172,11 +187,11 @@ def GenerateImage(sdRepo =  "runwayml/stable-diffusion-v1-5", loraPath = "", tex
     
 
 
-    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, width = width, height= height, guidance_scale=textGuidance).images
+    images = pipe(prompt=prompt_, negative_prompt=negPrompt_, num_inference_steps=steps, num_images_per_prompt = imagesToGenerate, width = width, height= height, guidance_scale=textGuidance, callback=callback).images
     return images
 
 
-def GenerateImageXL(sdRepo =  "stabilityai/stable-diffusion-xl-base-1.0", loraPath = "minimaxir/sdxl-wrong-lora", textualInversion = "",customSDBin = "", refinerRepo = "", vaeRepo = "madebyollin/sdxl-vae-fp16-fix", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=1024, height=1024, textGuidance=7.5,  high_noise_frac=0.8, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False):
+def GenerateImageXL(sdRepo =  "stabilityai/stable-diffusion-xl-base-1.0", loraPath = "minimaxir/sdxl-wrong-lora", textualInversion = "",customSDBin = "", refinerRepo = "", vaeRepo = "madebyollin/sdxl-vae-fp16-fix", imagesToGenerate = 1, steps = 20, device="cuda", prompt_ = "A person", negPrompt_ = "bad face", seed=42, width=1024, height=1024, textGuidance=7.5,  high_noise_frac=0.8, enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False,callback = None):
     """
     Generate an XLimage from a text prompt using Stable Diffusion.
     
@@ -239,7 +254,7 @@ def GenerateImageXL(sdRepo =  "stabilityai/stable-diffusion-xl-base-1.0", loraPa
     # prompt = "A 3d render death metal album cover with Marilyn Monroe wearing Raybans while shooting a machine gun in a jungle. octane render. high quality. cinematic. aesthetic. award winning. hyper metal. 8k"
     negativePrompt = "wrong . low quality. " + negPrompt_
 
-    image = pipe(prompt=prompt, negative_prompt=negativePrompt, num_inference_steps=n_steps,  guidance_scale=textGuidance, num_images_per_prompt= imagesToGenerate).images
+    image = pipe(prompt=prompt, negative_prompt=negativePrompt, num_inference_steps=n_steps,  guidance_scale=textGuidance, num_images_per_prompt= imagesToGenerate,callback=callback).images
     outimages = []
     for index, img in enumerate(image):
         if refinerRepo != "":
@@ -247,7 +262,8 @@ def GenerateImageXL(sdRepo =  "stabilityai/stable-diffusion-xl-base-1.0", loraPa
                 prompt=prompt,
                 num_inference_steps=n_steps,
                 denoising_start=high_noise_frac,
-                image=img
+                image=img,
+                callback=callback
             ).images[0]
             outimages.append(image_)
         else:
@@ -1303,3 +1319,4 @@ def AddNewMediaContent(url,route, stringData,user):
     media =  AddMediaContent(CreateNewMediaContent(name = "Untitled", url = url,user = user, description = "", nsfw = False, remixable = True, metadata = stringData, tags = "AI", project = "", app = "", settings = route, visibility = "Private", views = 0))['media']
     media['user'] = { "id" : user}
     return media
+
