@@ -1,8 +1,6 @@
 import time
 import json
-from importTime import startTotal, endTotal
 
-startTotal()
 # startImport()
 import numpy as np
 import torch
@@ -23,26 +21,18 @@ import base64
 import glob
 import os
 import mimetypes
-import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 responseMessage = ""
-endTotal()
 CLRMaxSteps = 20
 def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
-    try:
-        from System import PythonCLR
-        PythonCLR.SendProgress(progress, message, done)
-    except:
-        pass
+    from System import PythonCLR
+    PythonCLR.SendProgress(progress, message, done)
 
 def CLRProgressCallback(step, timeScale, tensor):
         global CLRMaxSteps
-        try:
-            from System import PythonCLR
-            percent = step / CLRMaxSteps
-            PythonCLR.SendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
-        except:
-            pass
+        from System import PythonCLR
+        percent = step / CLRMaxSteps
+        PythonCLR.SendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
         
 def SendCLRJSON(message = {}):
     from System import PythonCLR
@@ -832,10 +822,7 @@ def Base64StringToPILImage(base64String):
     '''
     Takes a base64 string and returns a PIL image
     '''
-    try:
-        return PIL.Image.open(io.BytesIO(base64.b64decode(base64String)))
-    except:
-        return None
+    return PIL.Image.open(io.BytesIO(base64.b64decode(base64String)))
 
 def uaiPromptImageJSONObjectToPILImage(promptImage):
     '''
