@@ -1,6 +1,7 @@
 import time
 import json
 from importTime import startTotal, endTotal
+import subprocess
 
 startTotal()
 # startImport()
@@ -25,9 +26,21 @@ import os
 import mimetypes
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
+import io, base64
 responseMessage = ""
 endTotal()
 CLRMaxSteps = 20
+stableDiffusionManager = None
+
+
+def SDLatentsToImage(latents):
+    latents = 1 / 0.18215 * latents
+    image = vae.decode(latents).sample[0]
+    image = (image / 2 + 0.5).clamp(0, 1)
+    image = numpy_to_pil(image.cpu().permute(1, 2, 0).numpy())
+    return image
+    
+    
 def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
     try:
         from System import PythonCLR
@@ -43,6 +56,20 @@ def CLRProgressCallback(step, timeScale, tensor):
             PythonCLR.SendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
         except:
             pass
+        
+def CLRProgressXLLightningCallback(diffuser, step, timeScale, callback_kwargs):
+        global CLRMaxSteps
+        try:
+            from System import PythonCLR
+            percent = float(step) / float(CLRMaxSteps)
+            pilImage = SDLatentsToImage(callback_kwargs["latents"])
+            io_ = io.BytesIO()
+            pilImage.save(io_, format='JPEG', quality=50)
+            base64Image = base64.b64encode(io_.getvalue()).decode('utf-8')
+            PythonCLR.SendProgressImage(percent,f"{str(int(percent * 100))}% conjuring image. Took {timeScale} seconds", base64Image, False)
+        except:
+            pass
+        return callback_kwargs
         
 def SendCLRJSON(message = {}):
     from System import PythonCLR
@@ -1332,3 +1359,60 @@ def AddNewMediaContent(url,route, stringData,user):
     media['user'] = { "id" : user}
     return media
 
+
+def CheckModelDownloaded(modelName):
+    # from diffusers.utils.constants import DIFFUSERS_CACHE
+    import glob
+    import os
+    searchPattern = os.path.join(os.environ['DIFFUSERS_CACHE'], "models--*"+modelName.replace("/", "--").replace("\\", "--")+"*")
+    SendCLRProgress(0.1, f"Checking For Model Cache: {searchPattern}", False)
+    
+    print(searchPattern)
+    matches = glob.glob(searchPattern)
+    if len(matches) > 0 :
+        SendCLRProgress(0.1, f"Loading {modelName} from cache.", False)
+        
+        return True
+    warning = f"{modelName} is being downloaded. Please wait this will take a bit."
+    SendCLRProgress(0.1, warning, False)
+    print(warning)
+    return False
+
+def ProcessFaceVideo(inputFile, outputFolder, frameRate, outputSize, padding = 300, deleteTemp = False):
+    """
+    Process a video with a face and crop the face out to a folder
+    
+    Args:
+        inputFile (str): The input file path
+        outputFolder (str): The output folder path
+        frameRate (int): The frame rate
+        outputSize (tuple): The output size
+        padding (int, optional): The padding. Defaults to 300.
+        deleteTemp (bool, optional): Delete the temp files. Defaults to False.
+        
+    Returns:
+        None
+    """
+    # Create output folder
+    outputPath = os.path.join(outputFolder, os.path.splitext( os.path.basename(inputFile))[0])
+    outputFrames = os.path.join(outputPath, "frames")
+    outputFaces = os.path.join(outputPath, "faces")
+    if not os.path.exists(outputPath):
+        os.makedirs(outputPath)
+        os.makedirs(outputFrames)
+        os.makedirs(outputFaces)
+
+    # Extract frames
+    ffmpegCmd = "ffmpeg -i {} -vf fps={} {}/%04d.png -y".format(inputFile, frameRate, outputFrames)
+    subprocess.call(ffmpegCmd, shell=True)
+
+    files = glob.glob(os.path.join(outputFrames, "*.png"))
+
+    for i, file in enumerate(files):
+        print(f"Processing {i+1}/{len(files)}")
+        img = Image.open(files[i])
+        img = PILToCV2(img)
+        croppedFace =CV2ToPIL(CropFace(img, padding, outputSize))
+        croppedFace.save(os.path.join(outputFaces, f"{i:04d}.png"))
+    if deleteTemp:
+        os.rmdir(outputFrames)
