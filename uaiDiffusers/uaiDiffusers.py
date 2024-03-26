@@ -27,9 +27,6 @@ import mimetypes
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 from uaiDiffusers.loadedAIPipelines import LoadedAIPipelines
-from uaiDiffusers.pipelines.stableDiffusionManager import StableDiffusionManager
-from diffusers import StableDiffusionInstructPix2PixPipeline, StableDiffusionPipeline
-from diffusers import EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMInverseScheduler, DDIMScheduler, DDPMScheduler, DPMSolverSDEScheduler , StableDiffusionControlNetPipeline, ControlNetModel, DPMSolverMultistepScheduler
 from diffusers.utils import load_image
 from PIL import Image
 import io, base64
@@ -38,19 +35,53 @@ endTotal()
 CLRMaxSteps = 20
 stableDiffusionManager = None
 
+import torchvision.transforms as T
+
     
     
+
+from  diffusers.image_processor import VaeImageProcessor
+from diffusers.utils import numpy_to_pil
+
+
+
+def latentsToPIL(latents):
+    latents = 1 / 0.18215 * latents
+    image = LoadedAIPipelines.getCurrentPipeline().pipe.vae.decode(latents).sample[0]
+    image = (image / 2 + 0.5).clamp(0, 1)
+    image = image.cpu()
+    transform = T.ToPILImage()
+    img = transform(image)
+    
+    return img
+
 
 
 def SDLatentsToImage(latents):
-    latents = 1 / 0.18215 * latents
-    try:
-        image = stableDiffusionManager.pipe.vae.decode(latents[0]).sample[0]
-        image = (image / 2 + 0.5).clamp(0, 1)
-        image = Image.fromarray(image.cpu().permute(1, 2, 0).numpy())
-        return image
-    except:
-        return None
+    # latents = 1 / 0.18215 * latents
+    # image = LoadedAIPipelines.getCurrentPipeline().pipe.vae.decode(latents).sample[0]
+    # image = (image / 2 + 0.5).clamp(0, 1)
+    # image = image.cpu()
+    # # file = open("P:/temp/debug.txt", "w")
+    # # file.write(str(image.shape))
+    # transform = T.ToPILImage()
+    img = latentsToPIL(latents)
+    return img
+    return latents_callback(latents)
+#     latents = 1 / 0.18215 * latents
+# # try:
+#     image = LoadedAIPipelines.getCurrentPipeline().pipe.vae.decode(latents).sample[0]
+#     image = (image / 2 + 0.5).clamp(0, 1)
+#     cv2image = image.cpu()image.permute(1, 2, 0).numpy()
+    
+#     # cv2image = cv2.cvtColor(cv2.COLOR_RGB2BGR)
+    
+    
+    
+#     pilImage = numpy_to_pil([cv2image])
+#     return pilImage
+#     # except:
+#     #     return None
     
     
 def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
@@ -71,16 +102,19 @@ def CLRProgressCallback(step, timeScale, tensor):
         
 def CLRProgressXLLightningCallback(diffuser, step, timeScale, callback_kwargs):
         global CLRMaxSteps
-        try:
-            from System import PythonCLR
-            percent = float(step) / float(CLRMaxSteps)
-            pilImage = SDLatentsToImage(callback_kwargs["latents"])
-            io_ = io.BytesIO()
-            pilImage.save(io_, format='JPEG', quality=50)
-            base64Image = base64.b64encode(io_.getvalue()).decode('utf-8')
-            PythonCLR.SendProgressImage(percent,f"{str(int(percent * 100))}% conjuring image. Took {timeScale} seconds", base64Image, False)
-        except:
-            pass
+        # try:
+        from System import PythonCLR
+        percent = float(step) / float(CLRMaxSteps)
+        # base64Image = latents_callback(callback_kwargs["latents"])
+        # pilImage = latents_callback(callback_kwargs["latents"])
+        pilImage = SDLatentsToImage(callback_kwargs["latents"])
+        io_ = io.BytesIO()
+        pilImage.save(io_, format='JPEG', quality=50)
+        base64Image = base64.b64encode(io_.getvalue()).decode('utf-8')
+        PythonCLR.SendProgressImage(percent,f"{str(int(percent * 100))}% conjuring image. Took {timeScale} seconds", base64Image, False)
+        # except(e):
+        #     print(e)
+        #     pass
         return callback_kwargs
         
 def SendCLRJSON(message = {}):

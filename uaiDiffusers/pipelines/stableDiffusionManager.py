@@ -5,7 +5,8 @@ import cv2
 import numpy as np
 from diffusers import StableDiffusionInstructPix2PixPipeline, StableDiffusionPipeline
 from diffusers import EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMInverseScheduler, DDIMScheduler, DDPMScheduler, DPMSolverSDEScheduler , StableDiffusionControlNetPipeline, ControlNetModel, DPMSolverMultistepScheduler
-
+from uaiDiffusers.loadedAIPipelines import LoadedAIPipelines
+from uaiDiffusers.pipelines.facefixgan import FaceFix
 def tempResponse():
     print("")
 
@@ -96,7 +97,7 @@ class StableDiffusionManager:
     
     instance = None
     
-    def __init__(self, pipe = None, sendProgress = tempProgress, onFinishedCallback = tempResponse, progressCallback = tempProgressResponse, imageProgressCallback = tempImageProgressResponse):
+    def __init__(self, pipe = None, pipeName="StableDiffusion",pipeType="StableDiffusion", sendProgress = tempProgress, onFinishedCallback = tempResponse, progressCallback = tempProgressResponse, imageProgressCallback = tempImageProgressResponse):
         """
         Attributes:
             pipe  (StableDiffusionPipeline): The Stable Diffusion pipeline.
@@ -113,6 +114,8 @@ class StableDiffusionManager:
         self.pipe  = pipe    
         self.modelName = "-"   
         self.device = "cuda" 
+        self.pipeName = pipeName 
+        self.pipeType = pipeType 
         self.scheduler  = None   
         self.steps  = 20   
         self.schedulerModel  = EulerAncestralDiscreteScheduler   
@@ -124,21 +127,23 @@ class StableDiffusionManager:
         self.textualInversionWeights = ""
         self.customSDBinWeights = ""
         self.aiType = "SD:GEN"
-        StableDiffusionManager.InitInstance(self)
+        self.InitInstance()
+        
         
     def __del__(self):
         self.CleanCache()
         
-    @staticmethod
-    def InitInstance(manager):
-        if StableDiffusionManager.instance == None:
-            StableDiffusionManager.instance = manager
         
+    def SetCurrentPipeline(self):
+        LoadedAIPipelines.setCurrentPipeline(self.pipeName)
+        
+    def InitInstance(self):
+        LoadedAIPipelines.addPipeline(self.pipeName, self)
+        self.SetCurrentPipeline()
+    
     @staticmethod
-    def GetInstance():
-        if StableDiffusionManager.instance == None:
-            StableDiffusionManager.instance = StableDiffusionManager()
-        return StableDiffusionManager.instance
+    def GetInstance(pipeName = "StableDiffusion"):
+        return LoadedAIPipelines.getPipeline(pipeName)
         
         
         
@@ -211,6 +216,7 @@ class StableDiffusionManager:
         # image = Image.fromarray(image)
         from diffusers import AutoencoderKL, StableDiffusionXLPipeline, DiffusionPipeline
     
+        self.SetCurrentPipeline()
         vae = AutoencoderKL.from_pretrained(
             vaeRepo,
             torch_dtype=torch.float16
@@ -258,8 +264,144 @@ class StableDiffusionManager:
             else:
                 outimages.append(img)
         return outimages
-    
         
+            
+    def GenerateSDXLLightning( self, prompt, negative_prompt , generator, num_images_per_prompt = 1, width=1024, height=1024 , steps=4, configScale=2.0):
+        # frame = pipe(prompt, negative_prompt =negative_prompt, generator=generator, num_inference_steps=4, num_images_per_prompt=num_images_per_prompt,guidance_scale=0 ).images[0]
+        frames = self.pipe(prompt, negative_prompt =negative_prompt, generator=generator,width=width, height=height, num_inference_steps=steps, num_images_per_prompt=num_images_per_prompt,guidance_scale=configScale, callback_on_step_end =self.imageProgressCallback ).images
+        return frames
+
+        
+    def RunProcessXLLightning(self, request, baseLoad= False):
+        import torch
+        from diffusers.utils import export_to_gif, load_image, export_to_video
+        from diffusers import StableDiffusionXLPipeline, UNet2DConditionModel, EulerDiscreteScheduler, DDPMScheduler, DDIMScheduler, AutoencoderKL
+        from huggingface_hub import hf_hub_download
+        from safetensors.torch import load_file
+        import os
+        global pipe
+        global modelName
+        global ip_model
+        # print(request)
+        steps = 6
+        configScale = 0
+        base = "SG161222/RealVisXL_V4.0_Lightning"
+        try:
+            base = request.model
+        except:
+            pass
+        self.SetCurrentPipeline()
+        self.sendProgress(0.1, "Starting the loading of Stable Diffusion XL Lightning Model", False)
+        renderImgs = []
+        if self.pipe is None or self.modelName != base:
+            # base = "stabilityai/stable-diffusion-xl-base-1.0"
+            # base = "SG161222/RealVisXL_V4.0_Lightning"
+            # base = "SG161222/RealVisXL_V2.0"
+            repo = "ByteDance/SDXL-Lightning"
+            ckpt = "sdxl_lightning_4step_unet.safetensors" # Use the correct ckpt for your step setting!
+            device = "cuda"
+            # Load model.
+            unet = UNet2DConditionModel.from_config(base, subfolder="unet").to("cuda", torch.float16)
+            unet.load_state_dict(load_file(hf_hub_download(repo, ckpt), device="cuda"))
+            vae_model_path = "stabilityai/sd-vae-ft-mse"
+            # vae = AutoencoderKL.from_pretrained(vae_model_path).to(dtype=torch.float16)
+            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+            self.sendProgress(0.14, "Loading Stable Diffusion XL Lightning Model", False)
+
+
+            # pipe = StableDiffusionXLPipeline.from_pretrained(base,  torch_dtype=torch.float16, vae=vae, variant="fp16").to("cuda")
+            pipe = StableDiffusionXLPipeline.from_pretrained(base, unet=unet, torch_dtype=torch.float16, vae=vae,variant="fp16").to("cuda")
+        # Ensure sampler uses "trailing" timesteps.
+            noise_scheduler = DDIMScheduler(
+                num_train_timesteps=1000,
+                beta_start=0.00085,
+                beta_end=0.012,
+                beta_schedule="scaled_linear",
+                clip_sample=False,
+                set_alpha_to_one=False,
+                steps_offset=1,
+                )
+            # pipe.scheduler = noise_scheduler
+            pipe.scheduler = DDPMScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+            
+            self.LoadPipe(pipe)
+            self.sendProgress(0.24, "Finished Loading Stable Diffusion XL Lightning Model", False)
+            
+        faceFixWeight = 0.8
+        try:
+            faceFixWeight = request.facefixweight
+        except:
+            pass
+        steps = request.steps
+        configScale = request.guidance_scale
+        if baseLoad:
+            outDict = {"media": []}
+            import numpy
+            # inputImage = Image.open(request.image)
+            # numpyImage = numpy.array(inputImage)
+            for i in range(request.imagesToGenerate):
+                width = 1024
+                ratio = float(request.height) / float(request.width)
+                height = int(ratio * width)
+                if request.height > request.width:
+                    height = 1024
+                    width = int(ratio * height)
+                generator = torch.manual_seed(request.seed + i)
+                self.sendProgress((float(i)/float(request.imagesToGenerate)), f"Generating image: {i} / {request.imagesToGenerate}", False)
+                
+                images = self.GenerateSDXLLightning( request.prompt, request.neg_prompt , generator, num_images_per_prompt = 1, width=width, height=height, steps=steps, configScale=configScale)
+                self.sendProgress(0.3, "Finished Generating image", False)
+                
+                personWords = ["person",  "people", "human", "girl", "boy", "man", "woman", "child", "children" , "lady", "mom", "dad", "mama", "papa", "grandpa", "grandma", "son", "daughter", "headshot", "female", "male", "adult", "face", "portrait", "head", "body", "person", "men", "women", "face"]
+                hasPerson = False
+                for word in personWords:
+                    if word in request.prompt:
+                        hasPerson = True
+                        break
+                if hasPerson:
+                    self.sendProgress(0.5, "Starting Retouching AI Face", False)
+                    
+                    
+                    facefixProcess = FaceFix()
+                    newImages = []
+                    for indx, image in enumerate(images):
+                        self.sendProgress((float(indx)/float(len(images))), f"Retouching AI Face: {indx} / {len(images)}", False)
+                        
+                        newReq = {
+                                    "inputimage" :None,
+                                    "version" :'1.3',
+                            "upscale" :2,
+                            "bg_upsampler" :"realesrgan",
+                            "bg_tile" :400,
+                            "suffix" :"None",
+                            "only_center_face" :False,
+                            "aligned" :False,
+                            "ext" :"auto",
+                            "weight" :faceFixWeight
+                                }
+                        # open_cv_image = np.array(image.convert("RGB"))
+                        # newReq["inputimage"] =  open_cv_image[:, :, ::-1].copy()
+                        fixedImage = facefixProcess.RunProcessWithInput(newReq, image.convert("RGB"))
+                        if fixedImage is not None:
+                            newImages.append(fixedImage)
+                        else:
+                            newImages.append(image)
+                        # newImages.append(fixedImage)
+                    self.sendProgress(0.5, "Finished Retouching AI Face", False)
+                    
+                    images = newImages
+                
+                resizedImages = [img.resize((request.width, request.height)) for img in images]
+                self.sendProgress(0.8, "Resized Images", False)
+                
+                if resizedImages is not []:
+                    renderImgs.extend(resizedImages)
+                    torch.cuda.empty_cache()
+                    self.sendProgress(0.98, "Finished Generating SDXL Lightning media", False)
+                    
+            outDict = MultiImagesToJSONResponse(renderImgs, [request.prompt for i in range(len(renderImgs))])
+            self.onFinishedCallback( outDict)
+            return outDict
         
         
     def isModelLoaded(self):
@@ -355,11 +497,14 @@ class StableDiffusionManager:
         self.sendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
         
     def GenerateImage(self, sdRepo = "",  prompt = "A person", negPrompt = "bad face", imagesToGenerate = 1, steps = 20, device="cuda",seed=42, width=512, height=512, textGuidance = 7.5, loraPath = "", textualInversion = "",customSDBin = "",  enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False):
+        
+        self.SetCurrentPipeline()
         return GenerateImage( sdRepo =  sdRepo, loraPath = loraPath, textualInversion = textualInversion,customSDBin = customSDBin, imagesToGenerate = imagesToGenerate, steps = steps, device=device, prompt_ = prompt, negPrompt_ = negPrompt, seed=seed,textGuidance = textGuidance,  enableCPUOffload = enableCPUOffload,enable_attention_slicing=enable_attention_slicing,enable_vae_tiling=enable_vae_tiling, pipe_=self.pipe, width=width, height=height, callback=self.imageProgressCallback)
     
     def GenerateImageRESTAPI(self, sdRepo = "",   prompt = "A person", negPrompt = "bad face", imagesToGenerate = 1, steps = 20, device="cuda",seed=42, width=512, height=512, textGuidance = 7.5 , loraPath = "", textualInversion = "",customSDBin = "",schedueler = "EulerAncestralDiscreteScheduler",  enableCPUOffload = True,enable_attention_slicing=False,enable_vae_tiling=False):
     # Get from JSON request ['prompt']
         model = sdRepo
+        self.SetCurrentPipeline()
         # if model != SDModel_id:
         #     ChangeModelImage(model)
         self.steps = steps
@@ -381,6 +526,7 @@ class StableDiffusionManager:
         # if model != SDModel_id:
         #     ChangeModelImage(model)
         self.steps = steps
+        self.SetCurrentPipeline()
         
         images = self.GenerateImageXL( sdRepo =  sdRepo, loraPath = loraPath, textualInversion = textualInversion,customSDBin = customSDBin, imagesToGenerate = imagesToGenerate, steps = steps, device=device, prompt_ = prompt, negPrompt_ = negPrompt, seed=seed,textGuidance = textGuidance,  enableCPUOffload = enableCPUOffload,enable_attention_slicing=enable_attention_slicing,enable_vae_tiling=enable_vae_tiling, width=width, height=height, high_noise_frac=high_noise_frac, refinerRepo=refinerRepo, vaeRepo=vaeRepo, callback=self.onProgressCallback)
         outResponse = MultiImagesToJSONResponse(images, [prompt for i in range(len(images))])
@@ -422,6 +568,7 @@ class StableDiffusionManager:
             self.pipe = StableDiffusionInstructPix2PixPipeline.from_pretrained(model_id, torch_dtype=torch.float16, safety_checker=None)
             self.pipe = self.pipe.to(device)
         generator = torch.Generator().manual_seed(seed)
+        self.SetCurrentPipeline()
         images = self.pipe(prompt, image=pilImage.convert('RGB'), num_inference_steps=num_inference_steps, image_guidance_scale=image_guidance_scale, negative_prompt=negative_prompt, generator=generator, num_images_per_prompt=num_images_per_prompt).images
         # Return the last num_images_per_prompt images. slice from the images list
         outarray = []
@@ -458,6 +605,7 @@ class StableDiffusionManager:
         
         """
         
+        self.SetCurrentPipeline()
         generator = torch.Generator(device=device).manual_seed(seed)
         if self.aiType != "SD:CANNY":
             self.SetAIType("SD:CANNY")
