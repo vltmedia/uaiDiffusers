@@ -26,19 +26,31 @@ import os
 import mimetypes
 import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
+from uaiDiffusers.loadedAIPipelines import LoadedAIPipelines
+from uaiDiffusers.pipelines.stableDiffusionManager import StableDiffusionManager
+from diffusers import StableDiffusionInstructPix2PixPipeline, StableDiffusionPipeline
+from diffusers import EulerDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMInverseScheduler, DDIMScheduler, DDPMScheduler, DPMSolverSDEScheduler , StableDiffusionControlNetPipeline, ControlNetModel, DPMSolverMultistepScheduler
+from diffusers.utils import load_image
+from PIL import Image
 import io, base64
 responseMessage = ""
 endTotal()
 CLRMaxSteps = 20
 stableDiffusionManager = None
 
+    
+    
+
 
 def SDLatentsToImage(latents):
     latents = 1 / 0.18215 * latents
-    image = vae.decode(latents).sample[0]
-    image = (image / 2 + 0.5).clamp(0, 1)
-    image = numpy_to_pil(image.cpu().permute(1, 2, 0).numpy())
-    return image
+    try:
+        image = stableDiffusionManager.pipe.vae.decode(latents[0]).sample[0]
+        image = (image / 2 + 0.5).clamp(0, 1)
+        image = Image.fromarray(image.cpu().permute(1, 2, 0).numpy())
+        return image
+    except:
+        return None
     
     
 def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
@@ -1414,5 +1426,15 @@ def ProcessFaceVideo(inputFile, outputFolder, frameRate, outputSize, padding = 3
         img = PILToCV2(img)
         croppedFace =CV2ToPIL(CropFace(img, padding, outputSize))
         croppedFace.save(os.path.join(outputFaces, f"{i:04d}.png"))
-    if deleteTemp:
-        os.rmdir(outputFrames)
+    # if deleteTemp:
+    #     os.remove(outputFrames)
+    
+    
+    
+    
+    
+    
+    
+    
+
+
