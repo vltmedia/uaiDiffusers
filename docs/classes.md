@@ -14,7 +14,7 @@ These are some classes that help in containing media and other metadata used in 
 
 # Base64 Media
 
-::: uaiDiffusers.media.mediaRequestBase
+::: uaiDiffusers.media.mediaRequest
     handler: python
     options:
       show_root_heading: true
