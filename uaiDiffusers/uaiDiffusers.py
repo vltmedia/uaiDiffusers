@@ -28,11 +28,13 @@ import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 from uaiDiffusers.loadedAIPipelines import LoadedAIPipelines
 from diffusers.utils import load_image
+from uaiDiffusers.common.imageRequest import ImageRequest
+from uaiDiffusers.pipelines.nestedNamespace import NestedNamespace
+from uaiDiffusers.common.utils import SetCLRMaxSteps, GetCLRMaxSteps
 from PIL import Image
 import io, base64
 responseMessage = ""
 endTotal()
-CLRMaxSteps = 20
 stableDiffusionManager = None
 
 import torchvision.transforms as T
@@ -44,6 +46,11 @@ from  diffusers.image_processor import VaeImageProcessor
 from diffusers.utils import numpy_to_pil
 
 
+def ParseImageRequest(request):
+    return ImageRequest.FromDict(request)
+
+def DictToClass(dictionary):
+    return NestedNamespace(dictionary)
 
 def latentsToPIL(latents):
     latents = 1 / 0.18215 * latents
@@ -55,6 +62,20 @@ def latentsToPIL(latents):
     
     return img
 
+# Copied from diffusers.pipelines.text_to_video_synthesis/pipeline_text_to_video_synth.TextToVideoSDPipeline.decode_latents
+def videolatentsParse(self, latents):
+    vae = LoadedAIPipelines.getCurrentPipeline().pipe.vae
+    latents = 1 / vae.config.scaling_factor * latents
+
+    batch_size, channels, num_frames, height, width = latents.shape
+    latents = latents.permute(0, 2, 1, 3, 4).reshape(batch_size * num_frames, channels, height, width)
+    image = vae.decode(latents).sample
+    # image = self.vae.decode(latents).sample
+    video = image[None, :].reshape((batch_size, num_frames, -1) + image.shape[2:]).permute(0, 2, 1, 3, 4)
+    # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+    video = video.float()
+    return video
+
 
 
 def SDLatentsToImage(latents):
@@ -64,8 +85,11 @@ def SDLatentsToImage(latents):
     # image = image.cpu()
     # # file = open("P:/temp/debug.txt", "w")
     # # file.write(str(image.shape))
+    # import pickle
+    # pickle.dump(latents, open("P:/temp/animDiffLatents.pkl", "wb"))
+    
     # transform = T.ToPILImage()
-    img = latentsToPIL(latents)
+    img = latentsToPIL(latents[0])
     return img
     return latents_callback(latents)
 #     latents = 1 / 0.18215 * latents
@@ -83,36 +107,72 @@ def SDLatentsToImage(latents):
 #     # except:
 #     #     return None
     
-    
+
 def SendCLRProgress(progress = 0.01, message = "Loading...", done = False):
     try:
         from System import PythonCLR
         PythonCLR.SendProgress(progress, message, done)
     except:
+        print(f"{progress} {message} {done}")
         pass
 
 def CLRProgressCallback(step, timeScale, tensor):
-        global CLRMaxSteps
-        try:
-            from System import PythonCLR
-            percent = step / CLRMaxSteps
-            PythonCLR.SendProgress(percent, f"{str(int(percent * 100))}% conjuring image.", False)
-        except:
-            pass
+    percent = float(step) / float(GetCLRMaxSteps())
+
+    message = f"{str(int(percent * 100))}% conjuring media."
+    try:
+        from System import PythonCLR
+        
+        PythonCLR.SendProgress(percent, message, False)
+    except:
+        print(message)
+        pass
         
 def CLRProgressXLLightningCallback(diffuser, step, timeScale, callback_kwargs):
-        global CLRMaxSteps
+    percent = float(step) / float(GetCLRMaxSteps())
+    try:
         # try:
         from System import PythonCLR
-        percent = float(step) / float(CLRMaxSteps)
         # base64Image = latents_callback(callback_kwargs["latents"])
         # pilImage = latents_callback(callback_kwargs["latents"])
         pilImage = SDLatentsToImage(callback_kwargs["latents"])
         io_ = io.BytesIO()
         pilImage.save(io_, format='JPEG', quality=50)
         base64Image = base64.b64encode(io_.getvalue()).decode('utf-8')
-        PythonCLR.SendProgressImage(percent,f"{str(int(percent * 100))}% conjuring image. Took {timeScale} seconds", base64Image, False)
+        PythonCLR.SendProgressImage(percent,f"{str(int(percent * 100))}% conjuring media. Took {timeScale} seconds", base64Image, False)
+    except:
+        print(f"{str(int(percent * 100))}% conjuring media. Took {timeScale} seconds")
         # except(e):
+        #     print(e)
+        #     pass
+        return callback_kwargs
+       
+        
+def CLRProgressImage(pilImage, percent, message):
+    try:
+        # try:
+        from System import PythonCLR
+        # base64Image = latents_callback(callback_kwargs["latents"])
+        # pilImage = latents_callback(callback_kwargs["latents"])
+        io_ = io.BytesIO()
+        pilImage.save(io_, format='JPEG', quality=50)
+        base64Image = base64.b64encode(io_.getvalue()).decode('utf-8')
+        PythonCLR.SendProgressImage(percent,message, base64Image, False)
+    except:
+        print(message)
+        # except(e):
+        
+def CLRProgressOnlyProgressCallback(diffuser, step, timeScale, callback_kwargs):
+    percent = float(step) / float(GetCLRMaxSteps())
+    try:
+        # try:
+        from System import PythonCLR
+        percent = float(step) / float(GetCLRMaxSteps())
+        # base64Image = latents_callback(callback_kwargs["latents"])
+        # pilImage = latents_callback(callback_kwargs["latents"])
+        PythonCLR.SendProgress(percent,f"{str(int(percent * 100))}% conjuring media. Took {float(timeScale)/ 100.0} seconds",  False)
+    except:
+        print(f"{str(int(percent * 100))}% conjuring media. Took {float(timeScale)/ 100.0} seconds")# except(e):
         #     print(e)
         #     pass
         return callback_kwargs
@@ -121,10 +181,7 @@ def SendCLRJSON(message = {}):
     from System import PythonCLR
     PythonCLR.SendJSON(message)
 
-def SetCLRMaxSteps(steps):
-        global CLRMaxSteps
-        CLRMaxSteps = steps
-        
+
 
 
 def OptimizePipe(pipe, enableCPUOffload = False,enable_attention_slicing=False,enable_vae_tiling=False ):

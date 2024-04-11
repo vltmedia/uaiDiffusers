@@ -215,5 +215,8 @@ class FaceFix:
         # torch.cuda.empty_cache()
         # return base64Img.decode('utf-8')  
         # cv2.imwrite('cropped_faces.jpg', cropped_faces[0])
-        return PIL.Image.fromarray(cv2.cvtColor(restored_img, cv2.COLOR_BGR2RGB)) 
+        try:
+            return PIL.Image.fromarray(cv2.cvtColor(restored_img, cv2.COLOR_BGR2RGB)) 
+        except:
+            return PIL.Image.fromarray(self.inputimage) 
         return restored_img  
