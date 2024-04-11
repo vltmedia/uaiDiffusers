@@ -1,7 +1,24 @@
 import requests
-import json
+import json, os
 from uaiDiffusers.uaiDiffusers import AddCreateJob, GetAUserStrapiID,AddNewMediaContent
+from authovalidator.validator import Auth0JWTBearerTokenValidator
+from authlib.integrations.flask_oauth2 import ResourceProtector
 
+def SetupFlaskAuth0():
+    """
+    Setup the Auth0 Authentication for the Flask App. Uses the Auth0 Domain and Audience from the environment variables AUTH0_DOMAIN and AUTH0_AUDIENCE
+    
+    Returns:
+        ResourceProtector: The Auth0 ResourceProtector for the Flask App.
+    """
+    require_auth = ResourceProtector()
+    validator = Auth0JWTBearerTokenValidator(
+    os.environ.get("AUTH0_DOMAIN"),
+    os.environ.get("AUTH0_AUDIENCE")
+)
+    require_auth.register_token_validator(validator)
+    return require_auth
+    
 def UploadMedia(media, path , mimeType = "image/jpeg"):
     """
     Upload media to the server
