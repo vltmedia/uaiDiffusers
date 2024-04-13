@@ -370,6 +370,22 @@ class ImageRequest:
         except:
             pass
         try:
+            import flask
+            import base64
+            inputImage = flask.request.files['inputImage']
+            image_string = base64.b64encode(inputImage.read())
+            imgRequest.input = image_string
+        except:
+            pass
+        try:
+            import flask
+            import base64
+            inputImage = flask.request.files['input']
+            image_string = base64.b64encode(inputImage.read())
+            imgRequest.input = image_string
+        except:
+            pass
+        try:
             imgRequest.mask = obj["mask"]
         except:
             pass
