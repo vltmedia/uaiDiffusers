@@ -70,6 +70,7 @@ class ImageRequest:
         self.faceEmbeddings = ""
         self.input = ""
         self.mask = ""
+        self.inputs = []
         self.masks = []
         self.mediaPaths = []
         self.urls = []
@@ -383,6 +384,43 @@ class ImageRequest:
             inputImage = flask.request.files['input']
             image_string = base64.b64encode(inputImage.read())
             imgRequest.input = image_string
+        except:
+            pass
+        try:
+            import flask
+            import base64
+            inputs = flask.request.files['inputs']
+            for inputImage in inputs:
+                image_string = base64.b64encode(inputImage.read())
+                imgRequest.inputs.append(image_string)
+        except:
+            pass
+        try:
+            import flask
+            import base64
+            inputs = flask.request.files['masks']
+            for inputImage in inputs:
+                image_string = base64.b64encode(inputImage.read())
+                imgRequest.masks.append(image_string)
+        except:
+            pass
+        try:
+            import flask
+            import base64
+            inputs = flask.request.files['styleImages']
+            for inputImage in inputs:
+                image_string = base64.b64encode(inputImage.read())
+                imgRequest.styleImages.append(image_string)
+        except:
+            pass
+        try:
+            import flask
+            import pickle
+            import base64
+            inputs = flask.request.files['faceEmbeddings']
+            for inputImage in inputs:
+                loaded = pickle.loads(inputImage.read())
+                imgRequest.faceEmbeddings.append(loaded)
         except:
             pass
         try:
