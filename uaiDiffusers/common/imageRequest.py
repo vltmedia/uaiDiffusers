@@ -27,6 +27,14 @@ class ImageRequest:
         self.maxSize = 1080
         self.resolution = 256
         self.topOffset = 0
+        self.altitude = 0
+        self.distance = 0
+        self.fov = 0
+        self.fovx = 0
+        self.fovy = 0
+        self.range = [0,1]
+        self.range2 = [0,1]
+        self.topOffset = 0
         self.version = "1.3"
         self.upscale = 2
         self.bg_upsampler = "realesrgan"
@@ -80,6 +88,11 @@ class ImageRequest:
         self.mediaPaths = []
         self.urls = []
         self.styleImages = []
+        self.vertecies = []
+        self.points = []
+        self.primitives = []
+        self.meshes = []
+        self.objects = []
         self.output = ""
         self.customSDBinWeights = ""
         self.textualInversionWeights = ""
@@ -206,6 +219,34 @@ class ImageRequest:
         
         try:
             imgRequest.exportFiles = bool(obj["exportFiles"])
+        except:
+            pass
+        
+        try:
+            imgRequest.vertecies = obj["vertecies"]
+        except:
+            pass
+        
+        try:
+            imgRequest.points = obj["points"]
+        except:
+            pass
+        
+        
+        try:
+            imgRequest.objects = obj["objects"]
+        except:
+            pass
+        
+        
+        try:
+            imgRequest.meshes = obj["meshes"]
+        except:
+            pass
+        
+        
+        try:
+            imgRequest.primitives = obj["primitives"]
         except:
             pass
         
@@ -377,6 +418,41 @@ class ImageRequest:
             imgRequest.vaeRepo = obj["vaeRepo"]
         except:
             pass
+        
+        
+        try:
+            imgRequest.altitude = float(obj["altitude"])
+        except:
+            pass
+        
+        try:
+            imgRequest.distance = float(obj["distance"])
+        except:
+            pass
+        
+        try:
+            imgRequest.fov = float(obj["fov"])
+        except:
+            pass
+        try:
+            imgRequest.fovc = float(obj["fovc"])
+        except:
+            pass
+        try:
+            imgRequest.fovy = float(obj["fovy"])
+        except:
+            pass
+        
+        try:
+            imgRequest.range = obj["range"]
+        except:
+            pass
+        
+        try:
+            imgRequest.range2 = obj["range2"]
+        except:
+            pass
+        
         try:
             imgRequest.schedueler = obj["schedueler"]
         except:
