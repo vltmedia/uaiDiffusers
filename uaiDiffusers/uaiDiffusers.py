@@ -24,7 +24,7 @@ import base64
 import glob
 import os
 import mimetypes
-import uaiDiffusers.hair as hair
+# import uaiDiffusers.hair as hair
 from uaiDiffusers.media.mediaRequestBase import MediaRequestBase64, MultipleMediaRequest
 from uaiDiffusers.loadedAIPipelines import LoadedAIPipelines
 from diffusers.utils import load_image
@@ -702,6 +702,7 @@ def GetSelfieFaceCannyEdges(img,   low_threshold = 50, high_threshold = 150):
 
 def GetHairMask(img):
     import cv2
+    from uaiDiffusers import hair
     image = PILToCV2(img, cv2.COLOR_RGB2BGR)
 
     hair_segmentation = hair.HairSegmentation(image.shape[1], image.shape[0])
