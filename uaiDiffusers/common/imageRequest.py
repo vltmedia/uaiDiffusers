@@ -50,6 +50,11 @@ class ImageRequest:
         self.maskIndex   = False
         self.watermarked   = False
         self.exportGif   = False
+        self.exportTextures   = False
+        self.exportMeshes   = False
+        self.exportFiles   = False
+        self.exportOther   = False
+        self.export   = False
         self.saveFaceEmbeddings   = False
         self.overrideForm   = "False"
         
@@ -183,6 +188,32 @@ class ImageRequest:
             imgRequest.seed = int(obj["seed"])
         except:
             pass
+        
+        try:
+            imgRequest.exportTextures = bool(obj["exportTextures"])
+        except:
+            pass
+        
+        try:
+            imgRequest.exportOther = bool(obj["exportOther"])
+        except:
+            pass
+        
+        try:
+            imgRequest.export = bool(obj["export"])
+        except:
+            pass
+        
+        try:
+            imgRequest.exportFiles = bool(obj["exportFiles"])
+        except:
+            pass
+        
+        try:
+            imgRequest.exportMeshes = bool(obj["exportMeshes"])
+        except:
+            pass
+        
         try:
             imgRequest.faceEmbeddings = obj["faceEmbeddings"]
         except:
