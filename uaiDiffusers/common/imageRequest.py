@@ -494,6 +494,13 @@ class ImageRequest:
         except:
             pass
         try:
+            import base64
+            inputs = obj["inputs"]
+            for inputImage in inputs:
+                imgRequest.inputs.append(image_string)
+        except:
+            pass
+        try:
             import flask
             import base64
             inputs = flask.request.files['inputs']
