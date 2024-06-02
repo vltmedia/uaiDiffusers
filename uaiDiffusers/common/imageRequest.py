@@ -511,35 +511,37 @@ class ImageRequest:
             pass
         
         
-        
-        if len(imgRequest.inputs) == 0:
-            try:
-                for inputImage in obj["inputs"]:
-                    if isinstance(inputImage, str):
-                        imgRequest.inputs.append(inputImage)
-                    elif isinstance(inputImage, dict):
-                        media_ = inputImage
-                        if "media" in inputImage:
-                            media_ = inputImage["media"]
-                        if "type" in inputImage:
-                            if inputImage["type"] == "input":
+        try:
+            if len(imgRequest.inputs) == 0:
+                try:
+                    for inputImage in obj["inputs"]:
+                        if isinstance(inputImage, str):
+                            imgRequest.inputs.append(inputImage)
+                        elif isinstance(inputImage, dict):
+                            media_ = inputImage
+                            if "media" in inputImage:
+                                media_ = inputImage["media"]
+                            if "type" in inputImage:
+                                if inputImage["type"] == "input":
+                                    imgRequest.inputs.append(media_)
+                                if inputImage["type"] == "mask":
+                                    imgRequest.masks.append(media_)
+                                if inputImage["type"] == "object":
+                                    imgRequest.objects.append(media_)
+                                if inputImage["type"] == "object":
+                                    imgRequest.objects.append(media_)
+                                if inputImage["type"] == "mesh":
+                                    imgRequest.meshes.append(media_)
+                                if inputImage["type"] == "styleImage":
+                                    imgRequest.styleImages.append(media_)
+                            else:
                                 imgRequest.inputs.append(media_)
-                            if inputImage["type"] == "mask":
-                                imgRequest.masks.append(media_)
-                            if inputImage["type"] == "object":
-                                imgRequest.objects.append(media_)
-                            if inputImage["type"] == "object":
-                                imgRequest.objects.append(media_)
-                            if inputImage["type"] == "mesh":
-                                imgRequest.meshes.append(media_)
-                            if inputImage["type"] == "styleImage":
-                                imgRequest.styleImages.append(media_)
-                        else:
-                            imgRequest.inputs.append(media_)
-            except:
-                imgRequest.inputs = obj["inputs"]
-                pass
-            
+                except:
+                    imgRequest.inputs = obj["inputs"]
+                    pass
+                
+        except:
+            pass
             
         
         try:
