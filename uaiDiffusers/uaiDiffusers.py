@@ -15,8 +15,9 @@ import uuid
 import cv2
 import zipfile
 import io
-import flask
-from flask import jsonify
+
+# import flask
+# from flask import jsonify
 import io
 import requests
 
@@ -872,6 +873,7 @@ def ImagesToZipFlaskResponse(pilImages):
         flask.Response: flask response with a zip binary in memory
     
     '''
+    import flask
     return  flask.send_file(ImagesToZip(pilImages), mimetype='application/zip')
 
 def ImageToBytes(pilImage):
@@ -932,7 +934,7 @@ def MultiImagesToFlaskResponse(pilImages, prompts):
         except:
             prompt = ""
         MultipleMediaRequest_.addMedia(MediaRequestBase64(ImagesToBase64(img), prompt))
-        
+    from flask import jsonify
     return jsonify(MultipleMediaRequest_.toDict())
 
 def MultiImagesToJSONResponse(pilImages, prompts):
